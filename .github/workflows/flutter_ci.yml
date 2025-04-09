@@ -1,0 +1,35 @@
+name: Flutter CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.19.x'
+        channel: 'stable'
+    
+    - name: Install dependencies
+      run: |
+        cd frontend/health_ai_app/health_ai
+        flutter pub get
+    
+    - name: Analyze code
+      run: |
+        cd frontend/health_ai_app/health_ai
+        flutter analyze
+    
+    - name: Run tests
+      run: |
+        cd frontend/health_ai_app/health_ai
+        flutter test
