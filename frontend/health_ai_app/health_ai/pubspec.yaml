@@ -44,6 +44,9 @@ dependencies:
   # State management
   provider: ^6.1.1
 
+  # Health data
+  health: ^8.1.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

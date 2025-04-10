@@ -1,0 +1,354 @@
+{
+  "user": {
+    "id": "user-123456",
+    "dateOfBirth": "1985-06-15",
+    "biologicalSex": "male",
+    "bloodType": "A+",
+    "heightInMeters": 1.78,
+    "lastSyncTime": "2023-05-15T10:00:00Z"
+  },
+  "workouts": [
+    {
+      "id": "workout-12345",
+      "type": "running",
+      "startTime": "2023-05-15T08:30:00Z",
+      "endTime": "2023-05-15T09:15:00Z",
+      "durationInSeconds": 2700,
+      "energyBurned": 350.5,
+      "distance": 5200,
+      "averageHeartRate": 145.2,
+      "maxHeartRate": 175,
+      "minHeartRate": 95,
+      "averagePace": 5.2,
+      "maxPace": 4.5,
+      "totalAscent": 85.3,
+      "totalDescent": 65.7,
+      "stepCount": 6500,
+      "cadence": 175,
+      "source": "Apple Health",
+      "metadata": {
+        "sourceRevision": "iPhone12,1",
+        "device": "iPhone",
+        "recordingMethod": "automatic"
+      }
+    },
+    {
+      "id": "workout-12346",
+      "type": "cycling",
+      "startTime": "2023-05-14T07:00:00Z",
+      "endTime": "2023-05-14T08:30:00Z",
+      "durationInSeconds": 5400,
+      "energyBurned": 650.2,
+      "distance": 25000,
+      "averageHeartRate": 135.5,
+      "maxHeartRate": 165,
+      "minHeartRate": 90,
+      "averagePace": 16.5,
+      "maxPace": 22.3,
+      "totalAscent": 320.5,
+      "totalDescent": 320.5,
+      "cadence": 85,
+      "power": 175.5,
+      "source": "Apple Health",
+      "metadata": {
+        "sourceRevision": "iPhone12,1",
+        "device": "iPhone",
+        "recordingMethod": "automatic"
+      }
+    }
+  ],
+  "activitySummaries": [
+    {
+      "date": "2023-05-15",
+      "activeEnergyBurned": 750.5,
+      "activeEnergyBurnedGoal": 700,
+      "exerciseMinutes": 45,
+      "exerciseMinutesGoal": 30,
+      "standHours": 12,
+      "standHoursGoal": 12,
+      "steps": 9500,
+      "stepsGoal": 10000,
+      "distanceWalkingRunning": 7500,
+      "flightsClimbed": 15
+    },
+    {
+      "date": "2023-05-14",
+      "activeEnergyBurned": 850.2,
+      "activeEnergyBurnedGoal": 700,
+      "exerciseMinutes": 90,
+      "exerciseMinutesGoal": 30,
+      "standHours": 14,
+      "standHoursGoal": 12,
+      "steps": 12500,
+      "stepsGoal": 10000,
+      "distanceWalkingRunning": 9200,
+      "flightsClimbed": 22
+    }
+  ],
+  "bodyMeasurements": [
+    {
+      "date": "2023-05-15",
+      "weightInKg": 75.5,
+      "bodyFatPercentage": 18.5,
+      "bmi": 23.8,
+      "leanBodyMassInKg": 61.5,
+      "waistCircumferenceInCm": 82.5,
+      "source": "Apple Health",
+      "timestamp": "2023-05-15T07:30:00Z"
+    },
+    {
+      "date": "2023-05-08",
+      "weightInKg": 76.2,
+      "bodyFatPercentage": 19.0,
+      "bmi": 24.0,
+      "leanBodyMassInKg": 61.7,
+      "waistCircumferenceInCm": 83.0,
+      "source": "Apple Health",
+      "timestamp": "2023-05-08T07:30:00Z"
+    }
+  ],
+  "heartData": {
+    "dailyAverages": [
+      {
+        "date": "2023-05-15",
+        "restingHeartRate": 58,
+        "averageHeartRate": 72,
+        "hrvRmssd": 45.5,
+        "hrvSdnn": 65.2
+      },
+      {
+        "date": "2023-05-14",
+        "restingHeartRate": 56,
+        "averageHeartRate": 75,
+        "hrvRmssd": 48.2,
+        "hrvSdnn": 68.5
+      }
+    ],
+    "heartRateEvents": [
+      {
+        "type": "highHeartRate",
+        "timestamp": "2023-05-15T14:30:00Z",
+        "value": 120,
+        "duration": 180
+      },
+      {
+        "type": "lowHeartRate",
+        "timestamp": "2023-05-15T02:30:00Z",
+        "value": 42,
+        "duration": 300
+      }
+    ]
+  },
+  "sleepData": [
+    {
+      "date": "2023-05-15",
+      "startTime": "2023-05-14T23:00:00Z",
+      "endTime": "2023-05-15T07:00:00Z",
+      "totalDurationInSeconds": 28800,
+      "inBedDurationInSeconds": 30600,
+      "asleepDurationInSeconds": 27000,
+      "deepSleepDurationInSeconds": 7200,
+      "remSleepDurationInSeconds": 6300,
+      "lightSleepDurationInSeconds": 13500,
+      "awakeInBedDurationInSeconds": 3600,
+      "sleepEfficiency": 88.2,
+      "segments": [
+        {
+          "startTime": "2023-05-14T23:00:00Z",
+          "endTime": "2023-05-14T23:30:00Z",
+          "type": "awake",
+          "durationInSeconds": 1800
+        },
+        {
+          "startTime": "2023-05-14T23:30:00Z",
+          "endTime": "2023-05-15T01:00:00Z",
+          "type": "light",
+          "durationInSeconds": 5400
+        },
+        {
+          "startTime": "2023-05-15T01:00:00Z",
+          "endTime": "2023-05-15T03:00:00Z",
+          "type": "deep",
+          "durationInSeconds": 7200
+        },
+        {
+          "startTime": "2023-05-15T03:00:00Z",
+          "endTime": "2023-05-15T04:45:00Z",
+          "type": "rem",
+          "durationInSeconds": 6300
+        },
+        {
+          "startTime": "2023-05-15T04:45:00Z",
+          "endTime": "2023-05-15T06:45:00Z",
+          "type": "light",
+          "durationInSeconds": 7200
+        },
+        {
+          "startTime": "2023-05-15T06:45:00Z",
+          "endTime": "2023-05-15T07:00:00Z",
+          "type": "awake",
+          "durationInSeconds": 900
+        }
+      ]
+    }
+  ],
+  "bloodGlucose": [
+    {
+      "timestamp": "2023-05-15T07:30:00Z",
+      "value": 95,
+      "unit": "mg/dL",
+      "mealTime": "fasting",
+      "source": "Apple Health"
+    },
+    {
+      "timestamp": "2023-05-15T12:30:00Z",
+      "value": 120,
+      "unit": "mg/dL",
+      "mealTime": "afterMeal",
+      "source": "Apple Health"
+    }
+  ],
+  "bloodPressure": [
+    {
+      "timestamp": "2023-05-15T07:35:00Z",
+      "systolic": 120,
+      "diastolic": 80,
+      "unit": "mmHg",
+      "source": "Apple Health"
+    },
+    {
+      "timestamp": "2023-05-15T19:35:00Z",
+      "systolic": 118,
+      "diastolic": 78,
+      "unit": "mmHg",
+      "source": "Apple Health"
+    }
+  ],
+  "oxygenSaturation": [
+    {
+      "timestamp": "2023-05-15T07:40:00Z",
+      "value": 98,
+      "unit": "%",
+      "source": "Apple Health"
+    },
+    {
+      "timestamp": "2023-05-15T19:40:00Z",
+      "value": 97,
+      "unit": "%",
+      "source": "Apple Health"
+    }
+  ],
+  "respiratoryRate": [
+    {
+      "timestamp": "2023-05-15T07:45:00Z",
+      "value": 14,
+      "unit": "breaths/min",
+      "source": "Apple Health"
+    },
+    {
+      "timestamp": "2023-05-15T19:45:00Z",
+      "value": 16,
+      "unit": "breaths/min",
+      "source": "Apple Health"
+    }
+  ],
+  "nutrition": [
+    {
+      "date": "2023-05-15",
+      "meals": [
+        {
+          "type": "breakfast",
+          "time": "2023-05-15T08:00:00Z",
+          "calories": 450,
+          "carbohydrates": 65,
+          "protein": 20,
+          "fat": 12,
+          "fiber": 8,
+          "sugar": 15,
+          "sodium": 350,
+          "items": [
+            {
+              "name": "Oatmeal",
+              "quantity": 1,
+              "unit": "bowl",
+              "calories": 250
+            },
+            {
+              "name": "Banana",
+              "quantity": 1,
+              "unit": "medium",
+              "calories": 105
+            },
+            {
+              "name": "Almond milk",
+              "quantity": 1,
+              "unit": "cup",
+              "calories": 95
+            }
+          ]
+        },
+        {
+          "type": "lunch",
+          "time": "2023-05-15T12:30:00Z",
+          "calories": 650,
+          "carbohydrates": 75,
+          "protein": 35,
+          "fat": 20,
+          "fiber": 12,
+          "sugar": 8,
+          "sodium": 750,
+          "items": [
+            {
+              "name": "Chicken salad sandwich",
+              "quantity": 1,
+              "unit": "sandwich",
+              "calories": 450
+            },
+            {
+              "name": "Apple",
+              "quantity": 1,
+              "unit": "medium",
+              "calories": 95
+            },
+            {
+              "name": "Sparkling water",
+              "quantity": 1,
+              "unit": "bottle",
+              "calories": 0
+            }
+          ]
+        }
+      ],
+      "totalCalories": 2200,
+      "totalCarbohydrates": 250,
+      "totalProtein": 120,
+      "totalFat": 70,
+      "totalFiber": 35,
+      "totalSugar": 45,
+      "totalSodium": 2200,
+      "waterIntake": 2500
+    }
+  ],
+  "mindfulness": [
+    {
+      "date": "2023-05-15",
+      "sessions": [
+        {
+          "startTime": "2023-05-15T06:00:00Z",
+          "endTime": "2023-05-15T06:15:00Z",
+          "durationInSeconds": 900,
+          "type": "meditation",
+          "source": "Apple Health"
+        },
+        {
+          "startTime": "2023-05-15T21:00:00Z",
+          "endTime": "2023-05-15T21:10:00Z",
+          "durationInSeconds": 600,
+          "type": "breathingExercise",
+          "source": "Apple Health"
+        }
+      ],
+      "totalDurationInSeconds": 1500
+    }
+  ]
+}

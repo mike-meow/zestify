@@ -1,15 +1,27 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 
 void main() {
+  // Add error handling for Flutter errors
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    debugPrint('Flutter error: ${details.exception}');
+  };
+
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-  runApp(const MyApp());
+
+  // Run the app with error handling
+  runZonedGuarded(() => runApp(const MyApp()), (error, stack) {
+    debugPrint('Caught error: $error');
+    debugPrint('Stack trace: $stack');
+  });
 }
 
 class MyApp extends StatelessWidget {

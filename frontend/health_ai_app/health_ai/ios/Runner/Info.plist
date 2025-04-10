@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSHealthShareUsageDescription</key>
+	<string>We need access to your health data to track your workouts and provide personalized insights.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>We need permission to update your health data to track your workouts and provide personalized insights.</string>
 </dict>
 </plist>

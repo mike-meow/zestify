@@ -3,6 +3,7 @@ import '../theme/app_theme.dart';
 import '../widgets/health_orb.dart';
 import '../widgets/bubble_card.dart';
 import '../widgets/chat_box.dart';
+import 'workout_history_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -70,7 +71,13 @@ class HomeScreen extends StatelessWidget {
                         icon: Icons.fitness_center,
                         gradient: AppTheme.primaryGradient,
                         onTap: () {
-                          // Navigate to workout history
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (context) => const WorkoutHistoryScreen(),
+                            ),
+                          );
                         },
                       ),
 
