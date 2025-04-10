@@ -1,12 +1,29 @@
 {
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "health_ai",
-            "request": "launch",
-            "type": "dart",
-            "flutterMode": "debug",
-            "program": "lib/main.dart"
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "health_ai (iPhone)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "debug",
+      "program": "lib/main.dart",
+      "deviceId": "iphone"
+    },
+    {
+      "name": "health_ai (Chrome)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "debug",
+      "program": "lib/main.dart",
+      "deviceId": "chrome"
+    },
+    {
+      "name": "health_ai (macOS)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "debug",
+      "program": "lib/main.dart",
+      "deviceId": "macos"
+    }
+  ]
 }
