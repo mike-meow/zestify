@@ -47,6 +47,9 @@ dependencies:
   # Health data
   health: ^8.1.0
 
+  # File storage
+  path_provider: ^2.1.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

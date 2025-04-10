@@ -12,6 +12,20 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          // Debug button to access file explorer
+          IconButton(
+            icon: const Icon(Icons.folder, color: AppTheme.textSecondaryColor),
+            onPressed: () {
+              Navigator.pushNamed(context, '/file_explorer');
+            },
+            tooltip: 'File Explorer',
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [

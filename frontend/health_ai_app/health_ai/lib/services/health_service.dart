@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../models/workout/workout.dart';
 import '../models/workout/workout_history.dart';
 import '../models/workout/heart_rate_sample.dart';
+import 'file_storage_service.dart';
 
 /// Service for interacting with Apple Health
 class HealthService {
@@ -164,12 +165,36 @@ class HealthService {
       // Sort workouts by start time (newest first)
       workoutModels.sort((a, b) => b.startTime.compareTo(a.startTime));
 
-      // Create and return workout history
-      return WorkoutHistory(
+      // Create workout history
+      final workoutHistory = WorkoutHistory(
         workouts: workoutModels,
         userId: 'current_user', // Replace with actual user ID when available
         lastSyncTime: DateTime.now(),
       );
+
+      // Save to files
+      final fileStorage = FileStorageService();
+      await fileStorage.saveWorkoutHistory(workoutHistory);
+
+      // Save each workout individually
+      for (final workout in workoutModels) {
+        await fileStorage.saveWorkout(workout);
+
+        // Save raw workout data for debugging/design
+        final rawWorkoutData = workout.toJson();
+        await fileStorage.saveRawHealthData(
+          'raw_workout_${workout.id}',
+          rawWorkoutData,
+        );
+      }
+
+      // Save all raw workout data for debugging/design
+      await fileStorage.saveRawHealthData(
+        'all_workouts_raw',
+        workoutModels.map((w) => w.toJson()).toList(),
+      );
+
+      return workoutHistory;
     } catch (e) {
       debugPrint('Error fetching workout history: $e');
       // Return empty workout history on error
@@ -276,24 +301,53 @@ class HealthService {
       );
 
       // Convert to HeartRateSample objects
-      return heartRateData.map((dataPoint) {
-        // Calculate offset in seconds from workout start
-        final offsetSeconds =
-            dataPoint.dateFrom.difference(workout.startTime).inSeconds;
+      final samples =
+          heartRateData.map((dataPoint) {
+            // Calculate offset in seconds from workout start
+            final offsetSeconds =
+                dataPoint.dateFrom.difference(workout.startTime).inSeconds;
 
-        // Extract the numeric value
-        final numericValue =
-            dataPoint.value is NumericHealthValue
-                ? (dataPoint.value as NumericHealthValue).numericValue
-                : 0.0;
+            // Extract the numeric value
+            final numericValue =
+                dataPoint.value is NumericHealthValue
+                    ? (dataPoint.value as NumericHealthValue).numericValue
+                    : 0.0;
 
-        return HeartRateSample(
-          value: numericValue.toDouble(),
-          timestamp: dataPoint.dateFrom,
-          workoutId: workout.id,
-          offsetSeconds: offsetSeconds,
-        );
-      }).toList();
+            return HeartRateSample(
+              value: numericValue.toDouble(),
+              timestamp: dataPoint.dateFrom,
+              workoutId: workout.id,
+              offsetSeconds: offsetSeconds,
+            );
+          }).toList();
+
+      // Save heart rate data to file
+      final fileStorage = FileStorageService();
+      await fileStorage.saveHeartRateSamples(workout.id, samples);
+
+      // Save raw heart rate data for debugging/design
+      final rawHeartRateData =
+          heartRateData
+              .map(
+                (dataPoint) => {
+                  'value':
+                      dataPoint.value is NumericHealthValue
+                          ? (dataPoint.value as NumericHealthValue).numericValue
+                          : 0.0,
+                  'timestamp': dataPoint.dateFrom.toIso8601String(),
+                  'offsetSeconds':
+                      dataPoint.dateFrom
+                          .difference(workout.startTime)
+                          .inSeconds,
+                },
+              )
+              .toList();
+      await fileStorage.saveRawHealthData(
+        'raw_heart_rate_${workout.id}',
+        rawHeartRateData,
+      );
+
+      return samples;
     } catch (e) {
       debugPrint('Error fetching heart rate data: $e');
       return [];

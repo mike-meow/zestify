@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
+import 'screens/debug/file_explorer_screen.dart';
 
 void main() {
   // Add error handling for Flutter errors
@@ -33,7 +34,11 @@ class MyApp extends StatelessWidget {
       title: 'Health AI Coach',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const HomeScreen(),
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const HomeScreen(),
+        '/file_explorer': (context) => const FileExplorerScreen(),
+      },
     );
   }
 }
