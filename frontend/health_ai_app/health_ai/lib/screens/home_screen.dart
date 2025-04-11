@@ -16,6 +16,17 @@ class HomeScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
+          // Health data download button
+          IconButton(
+            icon: const Icon(
+              Icons.cloud_download,
+              color: AppTheme.textSecondaryColor,
+            ),
+            onPressed: () {
+              Navigator.pushNamed(context, '/health_data_download');
+            },
+            tooltip: 'Download Health Data',
+          ),
           // Debug button to access file explorer
           IconButton(
             icon: const Icon(Icons.folder, color: AppTheme.textSecondaryColor),

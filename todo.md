@@ -25,8 +25,8 @@
   - [x] Add basic heart rate statistics display
 - [x] Implement route/GPS data collection for outdoor workouts
   - [x] Create RoutePoint model
-  - [ ] Update health service to fetch route data
-  - [ ] Add map visualization for workout routes
+  - [x] Update health service to fetch route data
+  - [x] Add basic route data display
 - [x] Implement workout segments/intervals tracking
   - [x] Create WorkoutSegment model
   - [ ] Update health service to fetch segment data

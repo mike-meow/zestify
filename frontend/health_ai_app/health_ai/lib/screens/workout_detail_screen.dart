@@ -16,6 +16,7 @@ class WorkoutDetailScreen extends StatefulWidget {
 class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
   late Future<Workout?> _workoutFuture;
   late Future<List<HeartRateSample>> _heartRateDataFuture;
+  late Future<List<Map<String, dynamic>>> _routeDataFuture;
 
   @override
   void initState() {
@@ -28,9 +29,13 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     _workoutFuture = healthService.fetchWorkoutById(widget.workoutId);
     _workoutFuture.then((workout) {
       if (workout != null) {
+        // Load heart rate data
         _heartRateDataFuture = healthService.getHeartRateDataForWorkout(
           workout,
         );
+
+        // Load route data
+        _routeDataFuture = healthService.getRouteDataForWorkout(workout);
       }
     });
   }
@@ -121,6 +126,8 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
                       _buildWorkoutMetrics(workout),
                       const SizedBox(height: 24),
                       _buildHeartRateSection(workout),
+                      const SizedBox(height: 24),
+                      _buildRouteSection(workout),
                     ],
                   ),
                 ),
@@ -462,6 +469,169 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildRouteSection(Workout workout) {
+    // Only show route section for outdoor workouts with distance
+    if (workout.distance == null || workout.distance == 0) {
+      return const SizedBox.shrink();
+    }
+
+    // Check if this is an outdoor workout type
+    final isOutdoorWorkout = [
+      WorkoutType.running,
+      WorkoutType.walking,
+      WorkoutType.hiking,
+      WorkoutType.cycling,
+    ].contains(workout.type);
+
+    if (!isOutdoorWorkout) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Route', style: AppTheme.subheadingStyle),
+            const SizedBox(height: 16),
+            FutureBuilder<List<Map<String, dynamic>>>(
+              future: _routeDataFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                }
+
+                if (snapshot.hasError ||
+                    !snapshot.hasData ||
+                    snapshot.data!.isEmpty) {
+                  return Container(
+                    height: 200,
+                    alignment: Alignment.center,
+                    child: Text(
+                      'No route data available',
+                      style: AppTheme.captionStyle,
+                    ),
+                  );
+                }
+
+                // Get route statistics
+                final routePoints = snapshot.data!;
+
+                // Calculate elevation gain/loss
+                double? elevationGain;
+                double? elevationLoss;
+
+                if (routePoints.every((point) => point['altitude'] != null)) {
+                  elevationGain = 0;
+                  elevationLoss = 0;
+
+                  for (int i = 1; i < routePoints.length; i++) {
+                    final prevAltitude =
+                        routePoints[i - 1]['altitude'] as double;
+                    final currAltitude = routePoints[i]['altitude'] as double;
+                    final diff = currAltitude - prevAltitude;
+
+                    if (diff > 0) {
+                      elevationGain = elevationGain! + diff;
+                    } else if (diff < 0) {
+                      elevationLoss = elevationLoss! + diff.abs();
+                    }
+                  }
+                }
+
+                // Route map would go here
+                return Column(
+                  children: [
+                    // Route stats
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildRouteStat(
+                            'Distance',
+                            workout.formattedDistance,
+                          ),
+                          if (elevationGain != null)
+                            _buildRouteStat(
+                              'Elevation Gain',
+                              '${elevationGain.round()} m',
+                            ),
+                          if (elevationLoss != null)
+                            _buildRouteStat(
+                              'Elevation Loss',
+                              '${elevationLoss.round()} m',
+                            ),
+                        ],
+                      ),
+                    ),
+                    // Route map
+                    Container(
+                      height: 200,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.map, size: 48, color: Colors.grey),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Route map will be displayed here',
+                              style: AppTheme.captionStyle,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              '${routePoints.length} GPS points recorded',
+                              style: AppTheme.captionStyle.copyWith(
+                                color: AppTheme.primaryColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRouteStat(String label, String value) {
+    return Column(
+      children: [
+        Text(label, style: AppTheme.captionStyle),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: AppTheme.bodyStyle.copyWith(
+            fontWeight: FontWeight.bold,
+            color:
+                label.contains('Gain')
+                    ? Colors.green
+                    : label.contains('Loss')
+                    ? Colors.red
+                    : AppTheme.primaryColor,
+          ),
+        ),
+      ],
     );
   }
 }

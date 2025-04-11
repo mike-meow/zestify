@@ -1,0 +1,30 @@
+# Health data and example data
+**/example_data/
+**/example_data/Documents/health_data/
+**/Documents/health_data/
+
+# Local environment files
+.env
+.env.local
+
+# Build artifacts
+**/build/
+**/dist/
+**/out/
+
+# Dependency directories
+**/node_modules/
+**/.pub-cache/
+**/.pub/
+**/.dart_tool/
+
+# IDE files
+**/.idea/
+**/.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS files
+.DS_Store
+Thumbs.db
