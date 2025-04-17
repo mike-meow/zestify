@@ -1,0 +1,82 @@
+user_id: ed98da97-effd-4414-9223-f770c95f5ed5
+last_updated: '2025-04-13T14:59:38.567964'
+demographics:
+  birth_date: ''
+  gender: ''
+  blood_type: ''
+measurements:
+  height:
+    current: 0.0
+    history:
+    - value: 0.0
+      date: ''
+      source: ''
+  weight:
+    current: 0.0
+    goal: 0.0
+    history:
+    - value: 0.0
+      date: ''
+      notes: ''
+  body_composition:
+    body_fat_percentage:
+      current: 0.0
+      history: []
+    muscle_mass_kg:
+      current: 0.0
+      history: []
+vitals:
+  resting_heart_rate:
+    current: 0
+    history: []
+  blood_pressure:
+    current:
+      systolic: 0
+      diastolic: 0
+    history: []
+conditions:
+  chronic:
+  - condition: ''
+    diagnosed_date: ''
+    severity: ''
+    medications: []
+    notes: ''
+  injuries:
+  - injury: ''
+    date_occurred: ''
+    affected_area: ''
+    status: ''
+    recovery_notes: ''
+fitness_assessments:
+  cardio:
+    vo2_max:
+      current: 0.0
+      history: []
+    resting_metabolic_rate:
+      current: 0
+      history: []
+  strength:
+  - exercise: ''
+    one_rep_max:
+      current: 0.0
+      unit: ''
+      history: []
+  flexibility:
+  - test: ''
+    measurement:
+      current: 0.0
+      unit: ''
+      history: []
+nutrition:
+  dietary_restrictions: []
+  supplements: []
+sleep:
+  average_duration: 0.0
+  quality_rating: ''
+  history: []
+medical_notes: []
+documents: []
+? ''
+: demographics:
+    age: 34.0
+    gender: other

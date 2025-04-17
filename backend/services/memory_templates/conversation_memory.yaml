@@ -1,0 +1,95 @@
+# Conversation Memory Template
+user_id: "example_user_123"
+last_updated: "2023-04-10T21:30:00Z"
+
+recent_conversations:
+  - id: "conv_20230410_1"
+    timestamp: "2023-04-10T20:15:00Z"
+    topic: "workout_planning"
+    summary: "Discussed upcoming week's workout plan with focus on 10k training"
+    key_points:
+      - "User wants to increase running frequency"
+      - "Concerned about knee pain after long runs"
+      - "Interested in cross-training options"
+    user_sentiment: "motivated"
+    action_items:
+      - "Create modified training plan with knee-friendly options"
+      - "Suggest cross-training activities for recovery days"
+      - "Schedule next check-in after Thursday's run"
+    follow_up_required: true
+    follow_up_date: "2023-04-13"
+  
+  - id: "conv_20230408_2"
+    timestamp: "2023-04-08T18:30:00Z"
+    topic: "nutrition_advice"
+    summary: "Discussed post-workout nutrition strategies"
+    key_points:
+      - "User struggles with appetite after intense workouts"
+      - "Looking for quick, protein-rich recovery options"
+      - "Prefers plant-based when possible"
+    user_sentiment: "curious"
+    action_items:
+      - "Share 3-5 quick post-workout snack recipes"
+      - "Explain timing of nutrition for optimal recovery"
+    follow_up_required: false
+
+important_insights:
+  - category: "workout_preferences"
+    insight: "User prefers structured workouts with clear targets"
+    confidence: 85  # percentage
+    supporting_evidence:
+      - "Consistently asks for specific pace targets"
+      - "Responds well to interval-based training"
+      - "Mentions feeling 'lost' without a plan"
+  
+  - category: "motivation_factors"
+    insight: "User motivated by performance metrics more than aesthetic goals"
+    confidence: 90
+    supporting_evidence:
+      - "Frequently discusses pace improvements"
+      - "Sets goals based on race times"
+      - "Less interested in weight/appearance discussions"
+  
+  - category: "adherence_patterns"
+    insight: "User more likely to complete workouts scheduled for mornings"
+    confidence: 75
+    supporting_evidence:
+      - "80% completion rate for morning workouts"
+      - "50% completion rate for evening workouts"
+      - "Mentions feeling 'too tired' after work"
+
+conversation_patterns:
+  engagement_level: "high"  # high, medium, low
+  response_time: "prompt"  # prompt, delayed, variable
+  conversation_depth: "detailed"  # brief, moderate, detailed
+  preferred_topics:
+    - topic: "performance_improvement"
+      engagement_score: 9  # 1-10 scale
+    - topic: "recovery_strategies"
+      engagement_score: 8
+    - topic: "nutrition"
+      engagement_score: 7
+    - topic: "sleep_optimization"
+      engagement_score: 5
+  avoided_topics:
+    - topic: "weight_management"
+      engagement_score: 3
+    - topic: "social_aspects_of_fitness"
+      engagement_score: 2
+
+communication_preferences:
+  tone: "direct and informative"  # supportive, motivational, direct, etc.
+  detail_level: "data-rich"  # concise, moderate, detailed
+  interaction_style: "question-answer"  # conversational, instructional, etc.
+  feedback_style: "constructive with alternatives"  # positive, balanced, direct
+  
+coaching_approach:
+  primary_style: "analytical coach"  # motivator, educator, challenger, etc.
+  effective_motivators:
+    - "Data showing progress"
+    - "Specific, achievable challenges"
+    - "Expert insights and research"
+  ineffective_approaches:
+    - "Generic encouragement"
+    - "Comparison to others"
+    - "Rigid prescriptions without rationale"

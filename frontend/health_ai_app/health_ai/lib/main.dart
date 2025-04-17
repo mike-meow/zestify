@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 import 'screens/debug/file_explorer_screen.dart';
-import 'screens/debug/health_data_download_screen.dart';
+import 'screens/debug/health_data_download_screen_v2.dart';
 
 void main() {
   // Add error handling for Flutter errors
@@ -35,11 +35,13 @@ class MyApp extends StatelessWidget {
       title: 'Health AI Coach',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      initialRoute: '/',
+      initialRoute:
+          '/health_data_download', // Start with the health data download screen for testing
       routes: {
         '/': (context) => const HomeScreen(),
         '/file_explorer': (context) => const FileExplorerScreen(),
-        '/health_data_download': (context) => const HealthDataDownloadScreen(),
+        '/health_data_download':
+            (context) => const HealthDataDownloadScreenV2(),
       },
     );
   }

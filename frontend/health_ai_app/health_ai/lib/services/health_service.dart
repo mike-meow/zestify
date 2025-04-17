@@ -4,6 +4,7 @@ import '../models/workout/workout.dart';
 import '../models/workout/workout_history.dart';
 import '../models/workout/heart_rate_sample.dart';
 import 'file_storage_service.dart';
+import 'api_service.dart';
 
 /// Service for interacting with Apple Health
 class HealthService {
@@ -14,6 +15,9 @@ class HealthService {
 
   /// Private constructor for singleton pattern
   HealthService._internal();
+
+  /// API service instance
+  final ApiService _apiService = ApiService();
 
   /// Health plugin instance
   final HealthFactory _health = HealthFactory(
@@ -622,6 +626,387 @@ class HealthService {
       return routePoints;
     } catch (e) {
       debugPrint('Error generating route data: $e');
+      return [];
+    }
+  }
+
+  /// Fetch and upload health data directly to the server (focused on key metrics only)
+  Future<bool> fetchAndUploadHealthData({
+    DateTime? startDate,
+    DateTime? endDate,
+    bool includeWorkoutDetails = true,
+  }) async {
+    // Ensure we have permissions
+    final hasPermissions = await initialize();
+    if (!hasPermissions) {
+      debugPrint('Health data permissions not granted');
+      return false;
+    }
+
+    // Ensure API service is initialized
+    if (!_apiService.isInitialized) {
+      debugPrint('API service not initialized');
+      return false;
+    }
+
+    // Ensure user ID is available
+    if (_apiService.userId == null) {
+      debugPrint('No user ID available');
+      return false;
+    }
+
+    // Default to last month if no date range provided
+    final now = DateTime.now();
+    final start = startDate ?? now.subtract(const Duration(days: 30));
+    final end = endDate ?? now;
+
+    debugPrint(
+      'Fetching key health metrics from ${start.toIso8601String()} to ${end.toIso8601String()}',
+    );
+
+    try {
+      // Create a map to store all the key metrics
+      final Map<String, dynamic> healthData = {
+        'timestamp': DateTime.now().toIso8601String(),
+        'metrics': {},
+      };
+
+      // Fetch key body metrics (most recent values only)
+      await _fetchKeyBodyMetrics(start, end, healthData);
+
+      // Process workouts separately
+      if (includeWorkoutDetails) {
+        final workouts = await _fetchAndProcessWorkouts(start, end);
+        if (workouts.isNotEmpty) {
+          healthData['workouts'] = workouts;
+        }
+      }
+
+      // Upload the consolidated health data
+      debugPrint('Uploading consolidated health data to server');
+      final success = await _apiService.uploadHealthData(healthData);
+
+      if (!success) {
+        debugPrint('Failed to upload health data');
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Error fetching and uploading health data: $e');
+      return false;
+    }
+  }
+
+  /// Fetch key body metrics (height, weight, etc.) and update memory
+  Future<void> _fetchKeyBodyMetrics(
+    DateTime start,
+    DateTime end,
+    Map<String, dynamic> healthData,
+  ) async {
+    // Define the key metrics we want to fetch
+    final keyMetrics = [
+      HealthDataType.HEIGHT,
+      HealthDataType.WEIGHT,
+      HealthDataType.BODY_MASS_INDEX,
+      HealthDataType.BODY_FAT_PERCENTAGE,
+      HealthDataType.RESTING_HEART_RATE,
+      HealthDataType.ACTIVE_ENERGY_BURNED,
+      HealthDataType.BASAL_ENERGY_BURNED,
+      HealthDataType.STEPS,
+      HealthDataType.BLOOD_PRESSURE_SYSTOLIC,
+      HealthDataType.BLOOD_PRESSURE_DIASTOLIC,
+    ];
+
+    // Prepare health metrics memory update
+    final Map<String, dynamic> healthMetricsUpdate = {};
+
+    // Prepare biometrics memory update
+    final Map<String, dynamic> biometricsUpdate = {};
+
+    // Initialize the structure
+    healthMetricsUpdate['measurements'] = {
+      'height': {'current': 0},
+      'weight': {'current': 0},
+      'body_composition': {
+        'body_fat_percentage': {'current': 0},
+        'bmi': {'current': 0},
+      },
+    };
+
+    healthMetricsUpdate['vitals'] = {
+      'resting_heart_rate': {'current': 0},
+      'blood_pressure': {
+        'current': {'systolic': 0, 'diastolic': 0},
+      },
+    };
+
+    biometricsUpdate['heart_rate'] = {
+      'resting': {'current': 0, 'unit': 'bpm'},
+    };
+
+    biometricsUpdate['body_composition'] = {
+      'height': {'current': 0, 'unit': 'cm'},
+      'weight': {'current': 0, 'unit': 'kg'},
+      'bmi': {'current': 0, 'unit': 'kg/m²'},
+      'body_fat': {'current': 0, 'unit': '%'},
+    };
+
+    biometricsUpdate['activity'] = {
+      'steps': {'current': 0, 'unit': 'steps'},
+      'calories_active': {'current': 0, 'unit': 'kcal'},
+      'calories_basal': {'current': 0, 'unit': 'kcal'},
+    };
+
+    biometricsUpdate['blood_pressure'] = {
+      'systolic': {'current': 0, 'unit': 'mmHg'},
+      'diastolic': {'current': 0, 'unit': 'mmHg'},
+    };
+
+    for (final metric in keyMetrics) {
+      try {
+        debugPrint('Fetching ${metric.name}');
+        final dataPoints = await _health.getHealthDataFromTypes(start, end, [
+          metric,
+        ]);
+
+        if (dataPoints.isEmpty) {
+          debugPrint('No data found for ${metric.name}');
+          continue;
+        }
+
+        // For most metrics, we just want the most recent value
+        dataPoints.sort(
+          (a, b) => b.dateFrom.compareTo(a.dateFrom),
+        ); // Sort by date (newest first)
+        final latestPoint = dataPoints.first;
+        final value = latestPoint.value.toString();
+        final unit = latestPoint.unit.name;
+        final date = latestPoint.dateFrom.toIso8601String();
+        final source = latestPoint.sourceName;
+
+        // Add to health data for legacy API
+        healthData['metrics'][metric.name] = {
+          'value': value,
+          'unit': unit,
+          'date': date,
+          'source': source,
+        };
+
+        // Update health metrics memory
+        switch (metric) {
+          case HealthDataType.HEIGHT:
+            (healthMetricsUpdate['measurements']['height'] as Map)['current'] =
+                value;
+            (biometricsUpdate['body_composition']['height'] as Map)['current'] =
+                value;
+            break;
+
+          case HealthDataType.WEIGHT:
+            (healthMetricsUpdate['measurements']['weight'] as Map)['current'] =
+                value;
+            (biometricsUpdate['body_composition']['weight'] as Map)['current'] =
+                value;
+            break;
+
+          case HealthDataType.BODY_MASS_INDEX:
+            (healthMetricsUpdate['measurements']['body_composition']['bmi']
+                    as Map)['current'] =
+                value;
+            (biometricsUpdate['body_composition']['bmi'] as Map)['current'] =
+                value;
+            break;
+
+          case HealthDataType.BODY_FAT_PERCENTAGE:
+            (healthMetricsUpdate['measurements']['body_composition']['body_fat_percentage']
+                    as Map)['current'] =
+                value;
+            (biometricsUpdate['body_composition']['body_fat']
+                    as Map)['current'] =
+                value;
+            break;
+
+          case HealthDataType.RESTING_HEART_RATE:
+            (healthMetricsUpdate['vitals']['resting_heart_rate']
+                    as Map)['current'] =
+                value;
+            (biometricsUpdate['heart_rate']['resting'] as Map)['current'] =
+                value;
+            break;
+
+          case HealthDataType.BLOOD_PRESSURE_SYSTOLIC:
+            (healthMetricsUpdate['vitals']['blood_pressure']['current']
+                    as Map)['systolic'] =
+                value;
+            (biometricsUpdate['blood_pressure']['systolic'] as Map)['current'] =
+                value;
+            break;
+
+          case HealthDataType.BLOOD_PRESSURE_DIASTOLIC:
+            (healthMetricsUpdate['vitals']['blood_pressure']['current']
+                    as Map)['diastolic'] =
+                value;
+            (biometricsUpdate['blood_pressure']['diastolic']
+                    as Map)['current'] =
+                value;
+            break;
+
+          case HealthDataType.STEPS:
+            (biometricsUpdate['activity']['steps'] as Map)['current'] = value;
+            break;
+
+          case HealthDataType.ACTIVE_ENERGY_BURNED:
+            (biometricsUpdate['activity']['calories_active']
+                    as Map)['current'] =
+                value;
+            break;
+
+          case HealthDataType.BASAL_ENERGY_BURNED:
+            (biometricsUpdate['activity']['calories_basal'] as Map)['current'] =
+                value;
+            break;
+
+          default:
+            break;
+        }
+
+        // For some metrics like steps, we might want to calculate daily averages
+        if (metric == HealthDataType.STEPS ||
+            metric == HealthDataType.ACTIVE_ENERGY_BURNED) {
+          // Group by day and calculate averages
+          final Map<String, List<HealthDataPoint>> pointsByDay = {};
+          for (final point in dataPoints) {
+            final day =
+                '${point.dateFrom.year}-${point.dateFrom.month.toString().padLeft(2, '0')}-${point.dateFrom.day.toString().padLeft(2, '0')}';
+            if (!pointsByDay.containsKey(day)) {
+              pointsByDay[day] = [];
+            }
+            pointsByDay[day]!.add(point);
+          }
+
+          // Calculate daily totals
+          final dailyTotals =
+              pointsByDay.entries.map((entry) {
+                final day = entry.key;
+                final points = entry.value;
+                final total = points.fold<double>(
+                  0,
+                  (sum, point) =>
+                      sum + (point.value as NumericHealthValue).numericValue,
+                );
+                return {
+                  'date': day,
+                  'value': total,
+                  'unit': points.first.unit.name,
+                };
+              }).toList();
+
+          // Sort by date (newest first)
+          dailyTotals.sort(
+            (a, b) => (b['date'] as String).compareTo(a['date'] as String),
+          );
+
+          // Add daily totals to health data
+          healthData['metrics']['${metric.name}_DAILY'] =
+              dailyTotals.take(7).toList(); // Last 7 days
+        }
+      } catch (e) {
+        debugPrint('Error processing ${metric.name}: $e');
+      }
+    }
+
+    // Update health metrics memory
+    await _apiService.updateHealthMetrics(healthMetricsUpdate);
+
+    // Update biometrics memory
+    await _apiService.updateBiometrics(biometricsUpdate);
+
+    debugPrint('Health metrics and biometrics memory updated');
+  }
+
+  /// Fetch and process workouts
+  Future<List<Map<String, dynamic>>> _fetchAndProcessWorkouts(
+    DateTime start,
+    DateTime end,
+  ) async {
+    try {
+      debugPrint('Fetching workouts');
+      final workoutHistory = await fetchWorkoutHistory(
+        startDate: start,
+        endDate: end,
+      );
+
+      if (workoutHistory.workouts.isEmpty) {
+        debugPrint('No workouts found');
+        return [];
+      }
+
+      debugPrint('Found ${workoutHistory.workouts.length} workouts');
+
+      // Convert workouts to simplified format with heart rate summaries
+      final processedWorkouts =
+          workoutHistory.workouts.map((workout) {
+            // Create a copy of the workout
+            final processedWorkout = {
+              'id': workout.id,
+              'workout_type': workout.type.displayName,
+              'start_date': workout.startTime.toIso8601String(),
+              'end_date': workout.endTime.toIso8601String(),
+              'duration': workout.durationInSeconds,
+              'energy_burned': workout.energyBurned,
+              'distance': workout.distance,
+              'source': workout.source,
+            };
+
+            // Add heart rate data if available
+            if (workout.minHeartRate != null &&
+                workout.maxHeartRate != null &&
+                workout.averageHeartRate != null) {
+              // Add heart rate summary
+              processedWorkout['heart_rate_summary'] = {
+                'min': workout.minHeartRate,
+                'max': workout.maxHeartRate,
+                'avg': workout.averageHeartRate,
+              };
+            }
+
+            return processedWorkout;
+          }).toList();
+
+      // Update workout memory incrementally
+      debugPrint('Uploading ${processedWorkouts.length} workouts to server...');
+      int successCount = 0;
+      int failCount = 0;
+
+      for (int i = 0; i < processedWorkouts.length; i++) {
+        final workout = processedWorkouts[i];
+        debugPrint(
+          'Uploading workout ${i + 1}/${processedWorkouts.length}: ${workout['id']}',
+        );
+
+        // Add each workout individually to memory
+        final success = await _apiService.addWorkout(workout);
+
+        if (success) {
+          successCount++;
+          debugPrint(
+            'Successfully uploaded workout ${i + 1}/${processedWorkouts.length}',
+          );
+        } else {
+          failCount++;
+          debugPrint(
+            'Failed to upload workout ${i + 1}/${processedWorkouts.length}',
+          );
+        }
+      }
+
+      debugPrint(
+        'Workout upload complete. Success: $successCount, Failed: $failCount',
+      );
+
+      return processedWorkouts;
+    } catch (e) {
+      debugPrint('Error processing workouts: $e');
       return [];
     }
   }

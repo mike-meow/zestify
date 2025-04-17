@@ -26,11 +26,11 @@ class FileStorageService {
   Future<Directory> get _healthDataDirectory async {
     final documentsDir = await _documentsDirectory;
     final healthDir = Directory('${documentsDir.path}/health_data');
-    
+
     if (!await healthDir.exists()) {
       await healthDir.create(recursive: true);
     }
-    
+
     return healthDir;
   }
 
@@ -38,11 +38,11 @@ class FileStorageService {
   Future<Directory> get _workoutsDirectory async {
     final healthDir = await _healthDataDirectory;
     final workoutsDir = Directory('${healthDir.path}/workouts');
-    
+
     if (!await workoutsDir.exists()) {
       await workoutsDir.create(recursive: true);
     }
-    
+
     return workoutsDir;
   }
 
@@ -50,11 +50,11 @@ class FileStorageService {
   Future<Directory> get _heartRateDirectory async {
     final healthDir = await _healthDataDirectory;
     final heartRateDir = Directory('${healthDir.path}/heart_rate');
-    
+
     if (!await heartRateDir.exists()) {
       await heartRateDir.create(recursive: true);
     }
-    
+
     return heartRateDir;
   }
 
@@ -62,11 +62,11 @@ class FileStorageService {
   Future<Directory> get _routeDataDirectory async {
     final healthDir = await _healthDataDirectory;
     final routeDataDir = Directory('${healthDir.path}/route_data');
-    
+
     if (!await routeDataDir.exists()) {
       await routeDataDir.create(recursive: true);
     }
-    
+
     return routeDataDir;
   }
 
@@ -75,11 +75,11 @@ class FileStorageService {
     try {
       final healthDir = await _healthDataDirectory;
       final file = File('${healthDir.path}/workout_history.json');
-      
+
       // Convert to JSON and save
       final jsonData = workoutHistory.toJson();
       await file.writeAsString(jsonEncode(jsonData));
-      
+
       debugPrint('Workout history saved to ${file.path}');
     } catch (e) {
       debugPrint('Error saving workout history: $e');
@@ -91,11 +91,11 @@ class FileStorageService {
     try {
       final workoutsDir = await _workoutsDirectory;
       final file = File('${workoutsDir.path}/${workout.id}.json');
-      
+
       // Convert to JSON and save
       final jsonData = workout.toJson();
       await file.writeAsString(jsonEncode(jsonData));
-      
+
       debugPrint('Workout saved to ${file.path}');
     } catch (e) {
       debugPrint('Error saving workout: $e');
@@ -103,15 +103,18 @@ class FileStorageService {
   }
 
   /// Save heart rate samples for a workout
-  Future<void> saveHeartRateSamples(String workoutId, List<HeartRateSample> samples) async {
+  Future<void> saveHeartRateSamples(
+    String workoutId,
+    List<HeartRateSample> samples,
+  ) async {
     try {
       final heartRateDir = await _heartRateDirectory;
       final file = File('${heartRateDir.path}/${workoutId}_heart_rate.json');
-      
+
       // Convert to JSON and save
       final jsonData = samples.map((sample) => sample.toJson()).toList();
       await file.writeAsString(jsonEncode(jsonData));
-      
+
       debugPrint('Heart rate data saved to ${file.path}');
     } catch (e) {
       debugPrint('Error saving heart rate data: $e');
@@ -119,14 +122,17 @@ class FileStorageService {
   }
 
   /// Save route points for a workout
-  Future<void> saveRoutePoints(String workoutId, List<dynamic> routePoints) async {
+  Future<void> saveRoutePoints(
+    String workoutId,
+    List<dynamic> routePoints,
+  ) async {
     try {
       final routeDataDir = await _routeDataDirectory;
       final file = File('${routeDataDir.path}/${workoutId}_route.json');
-      
+
       // Convert to JSON and save
       await file.writeAsString(jsonEncode(routePoints));
-      
+
       debugPrint('Route data saved to ${file.path}');
     } catch (e) {
       debugPrint('Error saving route data: $e');
@@ -138,10 +144,10 @@ class FileStorageService {
     try {
       final healthDir = await _healthDataDirectory;
       final file = File('${healthDir.path}/$filename.json');
-      
+
       // Convert to JSON and save
       await file.writeAsString(jsonEncode(data));
-      
+
       debugPrint('Raw health data saved to ${file.path}');
     } catch (e) {
       debugPrint('Error saving raw health data: $e');
@@ -153,13 +159,13 @@ class FileStorageService {
     try {
       final healthDir = await _healthDataDirectory;
       final file = File('${healthDir.path}/workout_history.json');
-      
+
       if (await file.exists()) {
         final jsonString = await file.readAsString();
         final jsonData = jsonDecode(jsonString);
         return WorkoutHistory.fromJson(jsonData);
       }
-      
+
       return null;
     } catch (e) {
       debugPrint('Error loading workout history: $e');
@@ -172,13 +178,13 @@ class FileStorageService {
     try {
       final workoutsDir = await _workoutsDirectory;
       final file = File('${workoutsDir.path}/$workoutId.json');
-      
+
       if (await file.exists()) {
         final jsonString = await file.readAsString();
         final jsonData = jsonDecode(jsonString);
         return Workout.fromJson(jsonData);
       }
-      
+
       return null;
     } catch (e) {
       debugPrint('Error loading workout: $e');
@@ -191,13 +197,13 @@ class FileStorageService {
     try {
       final heartRateDir = await _heartRateDirectory;
       final file = File('${heartRateDir.path}/${workoutId}_heart_rate.json');
-      
+
       if (await file.exists()) {
         final jsonString = await file.readAsString();
         final jsonData = jsonDecode(jsonString) as List;
         return jsonData.map((item) => HeartRateSample.fromJson(item)).toList();
       }
-      
+
       return [];
     } catch (e) {
       debugPrint('Error loading heart rate data: $e');
@@ -210,12 +216,12 @@ class FileStorageService {
     try {
       final routeDataDir = await _routeDataDirectory;
       final file = File('${routeDataDir.path}/${workoutId}_route.json');
-      
+
       if (await file.exists()) {
         final jsonString = await file.readAsString();
         return jsonDecode(jsonString);
       }
-      
+
       return [];
     } catch (e) {
       debugPrint('Error loading route data: $e');
@@ -228,12 +234,12 @@ class FileStorageService {
     try {
       final healthDir = await _healthDataDirectory;
       final file = File('${healthDir.path}/$filename.json');
-      
+
       if (await file.exists()) {
         final jsonString = await file.readAsString();
         return jsonDecode(jsonString);
       }
-      
+
       return null;
     } catch (e) {
       debugPrint('Error loading raw health data: $e');
@@ -244,47 +250,51 @@ class FileStorageService {
   /// Get a list of all saved files in the health data directory
   Future<Map<String, List<String>>> getFileList() async {
     final result = <String, List<String>>{};
-    
+
     try {
       // Get main health data directory files
       final healthDir = await _healthDataDirectory;
-      final healthFiles = await healthDir
-          .list()
-          .where((entity) => entity is File)
-          .map((entity) => entity.path.split('/').last)
-          .toList();
+      final healthFiles =
+          await healthDir
+              .list()
+              .where((entity) => entity is File)
+              .map((entity) => entity.path.split('/').last)
+              .toList();
       result['health_data'] = healthFiles;
-      
+
       // Get workout files
       final workoutsDir = await _workoutsDirectory;
-      final workoutFiles = await workoutsDir
-          .list()
-          .where((entity) => entity is File)
-          .map((entity) => entity.path.split('/').last)
-          .toList();
+      final workoutFiles =
+          await workoutsDir
+              .list()
+              .where((entity) => entity is File)
+              .map((entity) => entity.path.split('/').last)
+              .toList();
       result['workouts'] = workoutFiles;
-      
+
       // Get heart rate files
       final heartRateDir = await _heartRateDirectory;
-      final heartRateFiles = await heartRateDir
-          .list()
-          .where((entity) => entity is File)
-          .map((entity) => entity.path.split('/').last)
-          .toList();
+      final heartRateFiles =
+          await heartRateDir
+              .list()
+              .where((entity) => entity is File)
+              .map((entity) => entity.path.split('/').last)
+              .toList();
       result['heart_rate'] = heartRateFiles;
-      
+
       // Get route data files
       final routeDataDir = await _routeDataDirectory;
-      final routeDataFiles = await routeDataDir
-          .list()
-          .where((entity) => entity is File)
-          .map((entity) => entity.path.split('/').last)
-          .toList();
+      final routeDataFiles =
+          await routeDataDir
+              .list()
+              .where((entity) => entity is File)
+              .map((entity) => entity.path.split('/').last)
+              .toList();
       result['route_data'] = routeDataFiles;
     } catch (e) {
       debugPrint('Error getting file list: $e');
     }
-    
+
     return result;
   }
 
@@ -292,5 +302,30 @@ class FileStorageService {
   Future<String> getHealthDataDirectoryPath() async {
     final healthDir = await _healthDataDirectory;
     return healthDir.path;
+  }
+
+  /// List all health data files in the health data directory
+  Future<List<String>> listHealthDataFiles() async {
+    try {
+      final healthDir = await _healthDataDirectory;
+      final files =
+          await healthDir
+              .list()
+              .where(
+                (entity) => entity is File && entity.path.endsWith('.json'),
+              )
+              .map(
+                (entity) => entity.path.split('/').last.replaceAll('.json', ''),
+              )
+              .toList();
+
+      // Sort files by name (which often contains timestamps)
+      files.sort();
+
+      return files;
+    } catch (e) {
+      debugPrint('Error listing health data files: $e');
+      return [];
+    }
   }
 }

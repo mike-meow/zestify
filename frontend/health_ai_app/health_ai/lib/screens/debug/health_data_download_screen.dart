@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../services/health_service.dart';
+import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
+import 'server_settings_screen.dart';
 
 /// A screen for downloading all health data
 class HealthDataDownloadScreen extends StatefulWidget {
@@ -13,9 +15,12 @@ class HealthDataDownloadScreen extends StatefulWidget {
 
 class _HealthDataDownloadScreenState extends State<HealthDataDownloadScreen> {
   final HealthService _healthService = HealthService();
+  final ApiService _apiService = ApiService();
   bool _isLoading = false;
+  bool _isUploading = false;
   Map<String, int> _results = {};
   String _statusMessage = '';
+  String _uploadStatusMessage = '';
 
   // Default to 5 years ago for maximum historical data
   DateTime? _startDate;
@@ -25,10 +30,21 @@ class _HealthDataDownloadScreenState extends State<HealthDataDownloadScreen> {
   @override
   void initState() {
     super.initState();
-    // Set default date range to last 5 years
+    // Set default date range to last 1 week
     final now = DateTime.now();
-    _startDate = now.subtract(const Duration(days: 365 * 5));
+    _startDate = now.subtract(const Duration(days: 7));
     _endDate = now;
+
+    // Initialize API service
+    _initializeApiService();
+  }
+
+  Future<void> _initializeApiService() async {
+    try {
+      await _apiService.initialize();
+    } catch (e) {
+      debugPrint('Error initializing API service: $e');
+    }
   }
 
   @override
@@ -71,7 +87,7 @@ class _HealthDataDownloadScreenState extends State<HealthDataDownloadScreen> {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'By default, we download data from the last 5 years to ensure you have your complete health history.',
+                      'By default, we download data from the last week to save time during development.',
                       style: TextStyle(fontStyle: FontStyle.italic),
                     ),
                   ],
@@ -167,7 +183,81 @@ class _HealthDataDownloadScreenState extends State<HealthDataDownloadScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Status message
+            // Upload biometrics button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _isUploading ? null : _uploadBiometrics,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child:
+                    _isUploading
+                        ? const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            ),
+                            SizedBox(width: 12),
+                            Text('Uploading...'),
+                          ],
+                        )
+                        : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.cloud_upload),
+                            SizedBox(width: 8),
+                            Text(
+                              'UPLOAD HEALTH DATA TO SERVER',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Server settings button
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ServerSettingsScreen(),
+                    ),
+                  );
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.primaryColor,
+                  side: BorderSide(color: AppTheme.primaryColor),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.settings),
+                    SizedBox(width: 8),
+                    Text(
+                      'SERVER SETTINGS',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Download status message
             if (_statusMessage.isNotEmpty)
               Container(
                 width: double.infinity,
@@ -185,7 +275,7 @@ class _HealthDataDownloadScreenState extends State<HealthDataDownloadScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Status:',
+                      'Download Status:',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: AppTheme.primaryColor,
@@ -193,6 +283,35 @@ class _HealthDataDownloadScreenState extends State<HealthDataDownloadScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(_statusMessage),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 16),
+
+            // Upload status message
+            if (_uploadStatusMessage.isNotEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.green.withAlpha(76), // 0.3 * 255 = 76
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Upload Status:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(_uploadStatusMessage),
                   ],
                 ),
               ),
@@ -286,6 +405,125 @@ class _HealthDataDownloadScreenState extends State<HealthDataDownloadScreen> {
         _statusMessage = 'Error: $e';
       });
     }
+  }
+
+  Future<void> _uploadBiometrics() async {
+    // Check if API service is initialized
+    if (!_apiService.isInitialized) {
+      _showServerSettingsDialog();
+      return;
+    }
+
+    // Check if user ID is available
+    if (_apiService.userId == null) {
+      _showCreateUserDialog();
+      return;
+    }
+
+    setState(() {
+      _isUploading = true;
+      _uploadStatusMessage = 'Preparing to upload health data directly...';
+    });
+
+    try {
+      // Upload health data directly
+      final success = await _healthService.fetchAndUploadHealthData(
+        startDate: _startDate,
+        endDate: _endDate,
+        includeWorkoutDetails: _includeWorkoutDetails,
+      );
+
+      setState(() {
+        _isUploading = false;
+        _uploadStatusMessage =
+            success
+                ? 'Health data uploaded successfully!'
+                : 'Failed to upload health data.';
+      });
+    } catch (e) {
+      setState(() {
+        _isUploading = false;
+        _uploadStatusMessage = 'Error: $e';
+      });
+    }
+  }
+
+  void _showServerSettingsDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Server Not Configured'),
+            content: const Text(
+              'You need to configure the server URL before uploading biometrics data.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('CANCEL'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ServerSettingsScreen(),
+                    ),
+                  );
+                },
+                child: const Text('CONFIGURE SERVER'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _showCreateUserDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Create User'),
+            content: const Text(
+              'You need to create a user before uploading biometrics data.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('CANCEL'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+
+                  setState(() {
+                    _isUploading = true;
+                    _uploadStatusMessage = 'Creating user...';
+                  });
+
+                  try {
+                    final userId = await _apiService.createUser();
+
+                    setState(() {
+                      _isUploading = false;
+                      _uploadStatusMessage =
+                          userId != null
+                              ? 'User created: $userId'
+                              : 'Failed to create user';
+                    });
+                  } catch (e) {
+                    setState(() {
+                      _isUploading = false;
+                      _uploadStatusMessage = 'Error creating user: $e';
+                    });
+                  }
+                },
+                child: const Text('CREATE USER'),
+              ),
+            ],
+          ),
+    );
   }
 
   Widget _buildResultsList() {

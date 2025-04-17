@@ -2,6 +2,8 @@
 **/example_data/
 **/example_data/Documents/health_data/
 **/Documents/health_data/
+**/example_user/
+backend/services/example_user/
 
 # Local environment files
 .env

@@ -1,0 +1,61 @@
+# User Profile Memory Template
+# Core User Information
+user_id: "" # Unique identifier
+name: "" # User's name
+created_at: "" # ISO timestamp
+updated_at: "" # ISO timestamp
+
+# Fitness Progress Timeline
+# Records changes in fitness metrics over time
+fitness_timeline:
+  - timestamp: "" # When this assessment was made
+    fitness_level: "" # beginner, intermediate, advanced
+    notes: "" # Additional context
+
+# Goals Timeline
+# Goals can be added, completed, or updated over time
+goals:
+  active: # Currently active goals
+    - id: "" # Goal identifier
+      type: "" # weight_loss, muscle_gain, endurance, etc.
+      description: "" # Detailed description
+      created_at: "" # When the goal was set
+      target_date: "" # Target completion date
+      metrics: # Measurable indicators
+        - name: "" # e.g., "weight", "running_distance"
+          current: "" # Current value
+          target: "" # Target value
+          unit: "" # e.g., "kg", "km"
+  completed: [] # List of completed goals with similar structure + completion_date
+
+# Workout Preferences
+# Can evolve over time
+preferences:
+  workout_locations: # Multiple possible
+    - location: "" # home, gym, outdoors, hybrid
+      priority: 0 # 1 = highest priority
+      added_at: "" # When this preference was added
+  time_availability:
+    preferred_time: "" # morning, afternoon, evening
+    days_per_week: 0 # 1-7
+    minutes_per_session: 0 # 15-180
+    updated_at: "" # When this was last updated
+  equipment_access: [] # List of available equipment
+  activity_preferences:
+    preferred: [] # List of preferred activities with timestamps
+    avoided: [] # List of avoided activities with timestamps
+
+# Motivation & Engagement
+motivation_factors: [] # List of motivation factors
+
+# Additional fields that may be used but aren't in the validation schema
+gender: "" # User's gender identity (optional)
+dietary_preferences: [] # List of dietary preferences (optional)
+sleep_habits:
+  bedtime: "" # Typical bedtime (optional)
+  wake_time: "" # Typical wake time (optional)
+  quality: "" # poor, fair, good, excellent (optional)
+notes: "" # Any additional notes or information (optional)
+
+# References to other files
+health_metrics_file: "" # Filename for health metrics history

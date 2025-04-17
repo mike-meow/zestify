@@ -50,6 +50,10 @@ dependencies:
   # File storage
   path_provider: ^2.1.2
 
+  # Network and data
+  http: ^1.2.1
+  shared_preferences: ^2.2.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
