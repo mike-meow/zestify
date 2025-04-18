@@ -11,43 +11,61 @@ base + {
     body_composition: {
       // Weight
       weight: {
-        current: 0.0,
+        value: 0.0,
         unit: "kg",
+        timestamp: "",
+        source: "Apple Health",
+        notes: null,
         history: [],
       },
 
       // BMI
       bmi: {
-        current: 0.0,
+        value: 0.0,
         unit: "kg/m²",
+        timestamp: "",
+        source: "Apple Health",
+        notes: null,
         history: [],
       },
 
       // Body fat percentage
       body_fat_percentage: {
-        current: 0.0,
+        value: 0.0,
         unit: "%",
+        timestamp: "",
+        source: "Apple Health",
+        notes: null,
         history: [],
       },
 
       // Height
       height: {
-        current: 0.0,
+        value: 0.0,
         unit: "cm",
+        timestamp: "",
+        source: "Apple Health",
+        notes: null,
         history: [],
       },
 
       // Lean body mass
       lean_body_mass: {
-        current: 0.0,
+        value: 0.0,
         unit: "kg",
+        timestamp: "",
+        source: "Apple Health",
+        notes: null,
         history: [],
       },
 
       // Waist circumference
       waist_circumference: {
-        current: 0.0,
+        value: 0.0,
         unit: "cm",
+        timestamp: "",
+        source: "Apple Health",
+        notes: null,
         history: [],
       },
     },
@@ -56,50 +74,71 @@ base + {
     vital_signs: {
       // Resting heart rate
       resting_heart_rate: {
-        current: 0.0,
+        value: 0.0,
         unit: "bpm",
+        timestamp: "",
+        source: "Apple Health",
+        notes: null,
         history: [],
       },
 
       // Blood pressure systolic
       blood_pressure_systolic: {
-        current: 0.0,
+        value: 0.0,
         unit: "mmHg",
+        timestamp: "",
+        source: "Apple Health",
+        notes: null,
         history: [],
       },
 
       // Blood pressure diastolic
       blood_pressure_diastolic: {
-        current: 0.0,
+        value: 0.0,
         unit: "mmHg",
+        timestamp: "",
+        source: "Apple Health",
+        notes: null,
         history: [],
       },
 
       // Respiratory rate
       respiratory_rate: {
-        current: 0.0,
+        value: 0.0,
         unit: "breaths/min",
+        timestamp: "",
+        source: "Apple Health",
+        notes: null,
         history: [],
       },
 
       // Blood oxygen
       blood_oxygen: {
-        current: 0.0,
+        value: 0.0,
         unit: "%",
+        timestamp: "",
+        source: "Apple Health",
+        notes: null,
         history: [],
       },
 
       // Blood glucose
       blood_glucose: {
-        current: 0.0,
+        value: 0.0,
         unit: "mg/dL",
+        timestamp: "",
+        source: "Apple Health",
+        notes: null,
         history: [],
       },
 
       // Body temperature
       body_temperature: {
-        current: 0.0,
+        value: 0.0,
         unit: "°C",
+        timestamp: "",
+        source: "Apple Health",
+        notes: null,
         history: [],
       },
     },
@@ -118,18 +157,20 @@ base + {
   // Convert to YAML-friendly format for LLM
   toYaml(data):: {
     body_composition: {
-      weight: data.body_composition.weight.current + " " + data.body_composition.weight.unit,
-      bmi: data.body_composition.bmi.current + " " + data.body_composition.bmi.unit,
-      body_fat: data.body_composition.body_fat_percentage.current + " " + data.body_composition.body_fat_percentage.unit,
-      height: data.body_composition.height.current + " " + data.body_composition.height.unit,
+      weight: data.body_composition.weight.value + " " + data.body_composition.weight.unit,
+      bmi: data.body_composition.bmi.value + " " + data.body_composition.bmi.unit,
+      body_fat: data.body_composition.body_fat_percentage.value + " " + data.body_composition.body_fat_percentage.unit,
+      height: data.body_composition.height.value + " " + data.body_composition.height.unit,
+      // Include history count for reference
+      weight_history_count: std.length(data.body_composition.weight.history),
     },
     vital_signs: {
-      resting_heart_rate: data.vital_signs.resting_heart_rate.current + " " + data.vital_signs.resting_heart_rate.unit,
-      blood_pressure: data.vital_signs.blood_pressure_systolic.current + "/" +
-                     data.vital_signs.blood_pressure_diastolic.current + " " +
+      resting_heart_rate: data.vital_signs.resting_heart_rate.value + " " + data.vital_signs.resting_heart_rate.unit,
+      blood_pressure: data.vital_signs.blood_pressure_systolic.value + "/" +
+                     data.vital_signs.blood_pressure_diastolic.value + " " +
                      data.vital_signs.blood_pressure_systolic.unit,
-      blood_oxygen: data.vital_signs.blood_oxygen.current + " " + data.vital_signs.blood_oxygen.unit,
-      blood_glucose: data.vital_signs.blood_glucose.current + " " + data.vital_signs.blood_glucose.unit,
+      blood_oxygen: data.vital_signs.blood_oxygen.value + " " + data.vital_signs.blood_oxygen.unit,
+      blood_glucose: data.vital_signs.blood_glucose.value + " " + data.vital_signs.blood_glucose.unit,
     },
   },
 }

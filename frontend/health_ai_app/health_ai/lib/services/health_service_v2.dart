@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:health/health.dart';
 import 'package:health_ai/services/api_service_v2.dart';
+import 'package:health_ai/services/biometrics_fetcher.dart';
 
 /// Source type for health data
 enum SourceType { appleHealth, manual, device, other }
@@ -18,7 +19,8 @@ class HealthServiceV2 {
   /// Health plugin instance
   final HealthFactory _health = HealthFactory();
 
-  // No file storage service needed for V2
+  /// Biometrics fetcher for full health histories
+  final BiometricsFetcher _biometricsFetcher = BiometricsFetcher();
 
   /// API service
   final ApiServiceV2 _apiService = ApiServiceV2();
@@ -104,9 +106,9 @@ class HealthServiceV2 {
       return false;
     }
 
-    // Default to last week if no date range provided (for faster iteration)
+    // Default to last year if no date range provided (to get more historical data)
     final now = DateTime.now();
-    final start = startDate ?? now.subtract(const Duration(days: 7));
+    final start = startDate ?? now.subtract(const Duration(days: 365));
     final end = endDate ?? now;
 
     debugPrint(
@@ -194,29 +196,82 @@ class HealthServiceV2 {
     return workoutTypeMap[healthKitWorkoutType] ?? 'Other';
   }
 
-  /// Fetch and process workouts
+  /// Fetch and process workouts using chunked fetching for better reliability
   Future<List<Map<String, dynamic>>> _fetchAndProcessWorkouts(
     DateTime startDate,
     DateTime endDate,
   ) async {
-    try {
-      debugPrint('Fetching workouts...');
-      final healthData = await _health.getHealthDataFromTypes(
-        startDate,
-        endDate,
-        [HealthDataType.WORKOUT],
-      );
+    debugPrint(
+      'Fetching workouts from ${startDate.toIso8601String()} to ${endDate.toIso8601String()}',
+    );
 
-      // Filter for workout data points
-      final workouts =
-          healthData.where((dp) => dp.value is WorkoutHealthValue).toList();
+    try {
+      // Get all workout data from health kit using chunked fetching
+      final List<HealthDataPoint> workouts = [];
+
+      // Try various chunk sizes - start with larger chunks
+      final List<Duration> chunkSizes = [
+        const Duration(days: 90), // 3 months
+        const Duration(days: 30), // 1 month
+        const Duration(days: 7), // 1 week
+      ];
+
+      bool foundWorkouts = false;
+
+      for (final chunkSize in chunkSizes) {
+        if (foundWorkouts)
+          break; // Skip if we already found workouts with larger chunks
+
+        debugPrint(
+          'Trying workout fetch with chunk size: ${chunkSize.inDays} days',
+        );
+
+        // Break request into smaller chunks to ensure we get all data
+        DateTime chunkStart = startDate;
+        while (chunkStart.isBefore(endDate)) {
+          // Calculate chunk end
+          final chunkEnd = chunkStart.add(chunkSize);
+          // Make sure we don't go past the end date
+          final adjustedChunkEnd =
+              chunkEnd.isAfter(endDate) ? endDate : chunkEnd;
+
+          debugPrint(
+            'Fetching workout chunk from ${chunkStart.toIso8601String()} to ${adjustedChunkEnd.toIso8601String()}',
+          );
+
+          try {
+            final chunkData = await _health.getHealthDataFromTypes(
+              chunkStart,
+              adjustedChunkEnd,
+              [HealthDataType.WORKOUT],
+            );
+
+            // Filter for workout data points
+            final workoutChunk =
+                chunkData
+                    .where((dp) => dp.value is WorkoutHealthValue)
+                    .toList();
+
+            if (workoutChunk.isNotEmpty) {
+              workouts.addAll(workoutChunk);
+              foundWorkouts = true;
+              debugPrint('Found ${workoutChunk.length} workouts in this chunk');
+            }
+          } catch (e) {
+            debugPrint('Error fetching workout chunk: $e');
+          }
+
+          // Move to next chunk
+          chunkStart = adjustedChunkEnd;
+        }
+      }
 
       if (workouts.isEmpty) {
-        debugPrint('No workouts found');
+        debugPrint('No workouts found after trying all chunk sizes');
         return [];
       }
 
-      debugPrint('Found ${workouts.length} workouts');
+      debugPrint('Found ${workouts.length} workouts in total');
 
       // Process workouts
       final processedWorkouts = <Map<String, dynamic>>[];
@@ -342,14 +397,11 @@ class HealthServiceV2 {
     try {
       debugPrint('Fetching biometrics...');
 
-      // Define the types to fetch
-      final bodyCompositionTypes = [
-        HealthDataType.WEIGHT,
-        HealthDataType.HEIGHT,
-        HealthDataType.BODY_MASS_INDEX,
-        HealthDataType.BODY_FAT_PERCENTAGE,
-      ];
+      // Use BiometricsFetcher to get full body composition history
+      final bodyCompositionData = await _biometricsFetcher
+          .fetchAllBodyComposition(startDate, endDate);
 
+      // Define vital signs types to fetch
       final vitalSignsTypes = [
         HealthDataType.HEART_RATE,
         HealthDataType.RESTING_HEART_RATE,
@@ -360,63 +412,6 @@ class HealthServiceV2 {
         HealthDataType.RESPIRATORY_RATE,
         HealthDataType.BODY_TEMPERATURE,
       ];
-
-      // Fetch body composition data
-      final bodyCompositionData = <String, dynamic>{};
-
-      for (final type in bodyCompositionTypes) {
-        try {
-          final data = await _health.getHealthDataFromTypes(
-            startDate,
-            endDate,
-            [type],
-          );
-
-          if (data.isEmpty) {
-            continue;
-          }
-
-          // Sort by date (newest first)
-          data.sort((a, b) => b.dateFrom.compareTo(a.dateFrom));
-
-          // Get the most recent value
-          final latestData = data.first;
-
-          // Map health data type to field name
-          String fieldName;
-          switch (type) {
-            case HealthDataType.WEIGHT:
-              fieldName = 'weight';
-              break;
-            case HealthDataType.HEIGHT:
-              fieldName = 'height';
-              break;
-            case HealthDataType.BODY_MASS_INDEX:
-              fieldName = 'bmi';
-              break;
-            case HealthDataType.BODY_FAT_PERCENTAGE:
-              fieldName = 'body_fat_percentage';
-              break;
-            default:
-              continue;
-          }
-
-          // Add to body composition data
-          if (latestData.value is NumericHealthValue) {
-            bodyCompositionData[fieldName] = {
-              'value':
-                  (latestData.value as NumericHealthValue).numericValue
-                      .toDouble(),
-              'unit': latestData.unit.name,
-              'timestamp': latestData.dateFrom.toIso8601String(),
-              'source': 'Apple Health',
-              'notes': null,
-            };
-          }
-        } catch (e) {
-          debugPrint('Error fetching ${type.name}: $e');
-        }
-      }
 
       // Fetch vital signs data
       final vitalSignsData = <String, dynamic>{};
@@ -490,9 +485,21 @@ class HealthServiceV2 {
       // Create biometrics data
       final biometrics = <String, dynamic>{'user_id': _apiService.userId};
 
-      // Add body composition data if not empty
-      if (bodyCompositionData.isNotEmpty) {
-        biometrics['body_composition'] = bodyCompositionData;
+      // Add body composition data if found
+      if (bodyCompositionData.isNotEmpty &&
+          bodyCompositionData.containsKey('body_composition')) {
+        biometrics['body_composition'] =
+            bodyCompositionData['body_composition'];
+
+        // Log how many weight records we have
+        if (biometrics['body_composition'].containsKey('weight') &&
+            biometrics['body_composition']['weight'].containsKey('history')) {
+          final weightHistoryCount =
+              biometrics['body_composition']['weight']['history'].length;
+          debugPrint(
+            'Including $weightHistoryCount weight records in biometrics data',
+          );
+        }
       }
 
       // Add vital signs data if not empty
@@ -507,14 +514,16 @@ class HealthServiceV2 {
     }
   }
 
-  /// Fetch activity data
+  /// Fetch activity data using chunked fetching for better reliability
   Future<List<Map<String, dynamic>>> _fetchActivities(
     DateTime startDate,
     DateTime endDate,
   ) async {
-    try {
-      debugPrint('Fetching activity data...');
+    debugPrint(
+      'Fetching activity data from ${startDate.toIso8601String()} to ${endDate.toIso8601String()}',
+    );
 
+    try {
       // Define the types to fetch
       final activityTypes = [
         HealthDataType.STEPS,
@@ -528,109 +537,141 @@ class HealthServiceV2 {
       // Create a map to store activity data by date
       final activityByDate = <String, Map<String, dynamic>>{};
 
+      // Try various chunk sizes for fetching
+      final List<Duration> chunkSizes = [
+        const Duration(days: 90), // 3 months
+        const Duration(days: 30), // 1 month
+        const Duration(days: 7), // 1 week
+      ];
+
       // Fetch data for each type
       for (final type in activityTypes) {
-        try {
-          final data = await _health.getHealthDataFromTypes(
-            startDate,
-            endDate,
-            [type],
+        debugPrint('Fetching activity data for ${type.name}');
+
+        // Use chunked fetching for each activity type
+        bool foundDataForType = false;
+
+        for (final chunkSize in chunkSizes) {
+          if (foundDataForType)
+            break; // Skip if we already found data with larger chunks
+
+          debugPrint(
+            'Trying activity fetch with chunk size: ${chunkSize.inDays} days',
           );
 
-          if (data.isEmpty) {
-            continue;
-          }
+          // Break request into smaller chunks
+          DateTime chunkStart = startDate;
 
-          // Process each data point
-          for (final point in data) {
-            // Extract date (YYYY-MM-DD)
-            final date = point.dateFrom.toIso8601String().split('T')[0];
+          while (chunkStart.isBefore(endDate)) {
+            // Calculate chunk end
+            final chunkEnd = chunkStart.add(chunkSize);
+            // Make sure we don't go past the end date
+            final adjustedChunkEnd =
+                chunkEnd.isAfter(endDate) ? endDate : chunkEnd;
 
-            // Create entry for this date if it doesn't exist
-            if (!activityByDate.containsKey(date)) {
-              activityByDate[date] = {'date': date, 'source': 'Apple Health'};
+            try {
+              final data = await _health.getHealthDataFromTypes(
+                chunkStart,
+                adjustedChunkEnd,
+                [type],
+              );
+
+              if (data.isNotEmpty) {
+                foundDataForType = true;
+                debugPrint(
+                  'Found ${data.length} ${type.name} records in chunk',
+                );
+
+                // Process each data point
+                for (final point in data) {
+                  // Extract date (YYYY-MM-DD)
+                  final date = point.dateFrom.toIso8601String().split('T')[0];
+
+                  // Create entry for this date if it doesn't exist
+                  if (!activityByDate.containsKey(date)) {
+                    activityByDate[date] = {
+                      'date': date,
+                      'source': 'Apple Health',
+                    };
+                  }
+
+                  // Add data based on type
+                  if (point.value is NumericHealthValue) {
+                    final numericValue =
+                        (point.value as NumericHealthValue).numericValue;
+
+                    switch (type) {
+                      case HealthDataType.STEPS:
+                        // Sum steps for the day
+                        final currentSteps =
+                            activityByDate[date]!['steps'] ?? 0;
+                        activityByDate[date]!['steps'] =
+                            currentSteps + numericValue.toInt();
+                        break;
+
+                      case HealthDataType.DISTANCE_WALKING_RUNNING:
+                        // Sum distance for the day (in km)
+                        final currentDistance =
+                            activityByDate[date]!['distance'] ?? 0.0;
+                        activityByDate[date]!['distance'] =
+                            currentDistance + numericValue.toDouble();
+                        activityByDate[date]!['distance_unit'] = 'km';
+                        break;
+
+                      case HealthDataType.FLIGHTS_CLIMBED:
+                        // Sum floors for the day
+                        final currentFloors =
+                            activityByDate[date]!['floors_climbed'] ?? 0;
+                        activityByDate[date]!['floors_climbed'] =
+                            currentFloors + numericValue.toInt();
+                        break;
+
+                      case HealthDataType.ACTIVE_ENERGY_BURNED:
+                        // Sum active energy for the day
+                        final currentEnergy =
+                            activityByDate[date]!['active_energy_burned'] ??
+                            0.0;
+                        activityByDate[date]!['active_energy_burned'] =
+                            currentEnergy + numericValue.toDouble();
+                        activityByDate[date]!['active_energy_burned_unit'] =
+                            'kcal';
+                        break;
+
+                      case HealthDataType.EXERCISE_TIME:
+                        // Sum exercise minutes for the day (convert from seconds)
+                        final currentExercise =
+                            activityByDate[date]!['exercise_minutes'] ?? 0;
+                        activityByDate[date]!['exercise_minutes'] =
+                            currentExercise + (numericValue.toInt() ~/ 60);
+                        break;
+
+                      case HealthDataType.MOVE_MINUTES:
+                        // Sum move minutes for the day (convert from seconds)
+                        final currentMove =
+                            activityByDate[date]!['move_minutes'] ?? 0;
+                        activityByDate[date]!['move_minutes'] =
+                            currentMove + (numericValue.toInt() ~/ 60);
+                        break;
+
+                      default:
+                        break;
+                    }
+                  }
+                }
+              }
+            } catch (e) {
+              debugPrint('Error fetching ${type.name} chunk: $e');
             }
 
-            // Add data based on type
-            switch (type) {
-              case HealthDataType.STEPS:
-                // Sum steps for the day
-                final currentSteps = activityByDate[date]!['steps'] ?? 0;
-                if (point.value is NumericHealthValue) {
-                  activityByDate[date]!['steps'] =
-                      currentSteps +
-                      (point.value as NumericHealthValue).numericValue.toInt();
-                }
-                break;
-              case HealthDataType.DISTANCE_WALKING_RUNNING:
-                // Sum distance for the day
-                final currentDistance =
-                    activityByDate[date]!['distance'] ?? 0.0;
-                if (point.value is NumericHealthValue) {
-                  activityByDate[date]!['distance'] =
-                      currentDistance +
-                      (point.value as NumericHealthValue).numericValue
-                          .toDouble();
-                  activityByDate[date]!['distance_unit'] = 'km';
-                }
-                break;
-              case HealthDataType.FLIGHTS_CLIMBED:
-                // Sum floors for the day
-                final currentFloors =
-                    activityByDate[date]!['floors_climbed'] ?? 0;
-                if (point.value is NumericHealthValue) {
-                  activityByDate[date]!['floors_climbed'] =
-                      currentFloors +
-                      (point.value as NumericHealthValue).numericValue.toInt();
-                }
-                break;
-              case HealthDataType.ACTIVE_ENERGY_BURNED:
-                // Sum active energy for the day
-                final currentEnergy =
-                    activityByDate[date]!['active_energy_burned'] ?? 0.0;
-                if (point.value is NumericHealthValue) {
-                  activityByDate[date]!['active_energy_burned'] =
-                      currentEnergy +
-                      (point.value as NumericHealthValue).numericValue
-                          .toDouble();
-                  activityByDate[date]!['active_energy_burned_unit'] = 'kcal';
-                }
-                break;
-              case HealthDataType.EXERCISE_TIME:
-                // Sum exercise minutes for the day
-                final currentExercise =
-                    activityByDate[date]!['exercise_minutes'] ?? 0;
-                if (point.value is NumericHealthValue) {
-                  activityByDate[date]!['exercise_minutes'] =
-                      currentExercise +
-                      ((point.value as NumericHealthValue).numericValue
-                              .toInt() ~/
-                          60);
-                }
-                break;
-              case HealthDataType.MOVE_MINUTES:
-                // Sum move minutes for the day
-                final currentMove = activityByDate[date]!['move_minutes'] ?? 0;
-                if (point.value is NumericHealthValue) {
-                  activityByDate[date]!['move_minutes'] =
-                      currentMove +
-                      ((point.value as NumericHealthValue).numericValue
-                              .toInt() ~/
-                          60);
-                }
-                break;
-              default:
-                break;
-            }
+            // Move to next chunk
+            chunkStart = adjustedChunkEnd;
           }
-        } catch (e) {
-          debugPrint('Error fetching ${type.name}: $e');
         }
       }
 
       // Convert map to list
       final activities = activityByDate.values.toList();
-
+      debugPrint('Processed activity data for ${activities.length} days');
       return activities;
     } catch (e) {
       debugPrint('Error fetching activity data: $e');
@@ -638,14 +679,16 @@ class HealthServiceV2 {
     }
   }
 
-  /// Fetch sleep data
+  /// Fetch sleep data using chunked fetching for better reliability
   Future<List<Map<String, dynamic>>> _fetchSleepData(
     DateTime startDate,
     DateTime endDate,
   ) async {
-    try {
-      debugPrint('Fetching sleep data...');
+    debugPrint(
+      'Fetching sleep data from ${startDate.toIso8601String()} to ${endDate.toIso8601String()}',
+    );
 
+    try {
       // Define the types to fetch
       final sleepTypes = [
         HealthDataType.SLEEP_IN_BED,
@@ -656,128 +699,121 @@ class HealthServiceV2 {
       // Fetch all sleep data
       final allSleepData = <HealthDataPoint>[];
 
+      // Try various chunk sizes for fetching
+      final List<Duration> chunkSizes = [
+        const Duration(days: 90), // 3 months
+        const Duration(days: 30), // 1 month
+        const Duration(days: 7), // 1 week
+      ];
+
       for (final type in sleepTypes) {
-        try {
-          final data = await _health.getHealthDataFromTypes(
-            startDate,
-            endDate,
-            [type],
+        debugPrint('Fetching sleep data for ${type.name}');
+
+        // Use chunked fetching for each sleep type
+        bool foundDataForType = false;
+
+        for (final chunkSize in chunkSizes) {
+          if (foundDataForType)
+            break; // Skip if we already found data with larger chunks
+
+          debugPrint(
+            'Trying sleep fetch with chunk size: ${chunkSize.inDays} days',
           );
 
-          if (data.isNotEmpty) {
-            allSleepData.addAll(data);
+          // Break request into smaller chunks
+          DateTime chunkStart = startDate;
+
+          while (chunkStart.isBefore(endDate)) {
+            // Calculate chunk end
+            final chunkEnd = chunkStart.add(chunkSize);
+            // Make sure we don't go past the end date
+            final adjustedChunkEnd =
+                chunkEnd.isAfter(endDate) ? endDate : chunkEnd;
+
+            try {
+              final data = await _health.getHealthDataFromTypes(
+                chunkStart,
+                adjustedChunkEnd,
+                [type],
+              );
+
+              if (data.isNotEmpty) {
+                allSleepData.addAll(data);
+                foundDataForType = true;
+                debugPrint(
+                  'Found ${data.length} ${type.name} records in chunk',
+                );
+              }
+            } catch (e) {
+              debugPrint('Error fetching ${type.name} chunk: $e');
+            }
+
+            // Move to next chunk
+            chunkStart = adjustedChunkEnd;
           }
-        } catch (e) {
-          debugPrint('Error fetching ${type.name}: $e');
         }
       }
 
       if (allSleepData.isEmpty) {
+        debugPrint('No sleep data found after trying all chunk sizes');
         return [];
       }
+
+      debugPrint('Found ${allSleepData.length} sleep records in total');
 
       // Sort by date
       allSleepData.sort((a, b) => a.dateFrom.compareTo(b.dateFrom));
 
-      // Group sleep data into sessions
+      // Process sleep data into sessions
       final sleepSessions = <Map<String, dynamic>>[];
-      Map<String, dynamic>? currentSession;
 
-      for (final data in allSleepData) {
-        // Skip invalid data
-        if (data.dateFrom.isAfter(data.dateTo)) {
-          continue;
+      // Group by date
+      final Map<String, List<HealthDataPoint>> sleepByDate = {};
+
+      for (final point in allSleepData) {
+        final date = point.dateFrom.toIso8601String().split('T')[0];
+        if (!sleepByDate.containsKey(date)) {
+          sleepByDate[date] = [];
         }
-
-        // Check if this is a new session
-        if (currentSession == null ||
-            data.dateFrom
-                    .difference(DateTime.parse(currentSession['end_date']))
-                    .inMinutes >
-                60) {
-          // Save previous session if it exists
-          if (currentSession != null) {
-            sleepSessions.add(currentSession);
-          }
-
-          // Create a new session
-          currentSession = {
-            'id': data.dateFrom.millisecondsSinceEpoch.toString(),
-            'start_date': data.dateFrom.toIso8601String(),
-            'end_date': data.dateTo.toIso8601String(),
-            'source': 'Apple Health',
-            'sleep_stages': [],
-          };
-        } else {
-          // Update end date if this data point extends the session
-          if (data.dateTo.isAfter(DateTime.parse(currentSession['end_date']))) {
-            currentSession['end_date'] = data.dateTo.toIso8601String();
-          }
-        }
-
-        // Add sleep stage
-        String stageType;
-        switch (data.type) {
-          case HealthDataType.SLEEP_ASLEEP:
-            stageType = 'ASLEEP';
-            break;
-          case HealthDataType.SLEEP_AWAKE:
-            stageType = 'AWAKE';
-            break;
-          case HealthDataType.SLEEP_IN_BED:
-            stageType = 'IN_BED';
-            break;
-          default:
-            stageType = 'UNKNOWN';
-        }
-
-        (currentSession['sleep_stages'] as List).add({
-          'stage_type': stageType,
-          'start_date': data.dateFrom.toIso8601String(),
-          'end_date': data.dateTo.toIso8601String(),
-          'duration_minutes': data.dateTo.difference(data.dateFrom).inMinutes,
-        });
+        sleepByDate[date]!.add(point);
       }
 
-      // Add the last session
-      if (currentSession != null) {
-        sleepSessions.add(currentSession);
-      }
+      // Process each date's sleep data
+      for (final date in sleepByDate.keys) {
+        final points = sleepByDate[date]!;
 
-      // Calculate total sleep duration for each session
-      for (final session in sleepSessions) {
-        final startDate = DateTime.parse(session['start_date']);
-        final endDate = DateTime.parse(session['end_date']);
-        session['duration_minutes'] = endDate.difference(startDate).inMinutes;
+        // Calculate total sleep time and quality
+        int totalSleepMinutes = 0;
+        int inBedMinutes = 0;
+        int awakeDuringMinutes = 0;
 
-        // Calculate sleep quality metrics
-        double asleepMinutes = 0;
-        double awakeMinutes = 0;
-        double inBedMinutes = 0;
+        for (final point in points) {
+          final durationMinutes =
+              point.dateTo.difference(point.dateFrom).inMinutes;
 
-        for (final stage in session['sleep_stages']) {
-          switch (stage['stage_type']) {
-            case 'ASLEEP':
-              asleepMinutes += stage['duration_minutes'];
-              break;
-            case 'AWAKE':
-              awakeMinutes += stage['duration_minutes'];
-              break;
-            case 'IN_BED':
-              inBedMinutes += stage['duration_minutes'];
-              break;
+          if (point.type == HealthDataType.SLEEP_ASLEEP) {
+            totalSleepMinutes += durationMinutes;
+          } else if (point.type == HealthDataType.SLEEP_IN_BED) {
+            inBedMinutes += durationMinutes;
+          } else if (point.type == HealthDataType.SLEEP_AWAKE) {
+            awakeDuringMinutes += durationMinutes;
           }
         }
 
-        session['asleep_minutes'] = asleepMinutes;
-        session['awake_minutes'] = awakeMinutes;
-        session['in_bed_minutes'] = inBedMinutes;
+        // Create sleep session entry
+        final session = {
+          'date': date,
+          'source': 'Apple Health',
+          'sleep_minutes': totalSleepMinutes,
+          'in_bed_minutes': inBedMinutes,
+          'awake_minutes': awakeDuringMinutes,
+          'efficiency':
+              inBedMinutes > 0
+                  ? (totalSleepMinutes / inBedMinutes * 100).round()
+                  : 0,
+        };
 
-        // Calculate sleep efficiency (time asleep / time in bed)
-        final totalInBed = asleepMinutes + awakeMinutes + inBedMinutes;
-        if (totalInBed > 0) {
-          session['sleep_efficiency'] = (asleepMinutes / totalInBed) * 100;
-        }
+        sleepSessions.add(session);
       }
 
       return sleepSessions;

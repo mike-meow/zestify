@@ -19,6 +19,7 @@ backend/services/example_user/
 **/.pub-cache/
 **/.pub/
 **/.dart_tool/
+data/
 
 # IDE files
 **/.idea/

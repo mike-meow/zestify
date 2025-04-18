@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:health_ai/screens/debug/health_data_download_screen_v2.dart';
+import 'package:health_ai/screens/home_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -16,7 +16,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
         useMaterial3: true,
       ),
-      home: const HealthDataDownloadScreenV2(),
+      home: const HomeScreen(),
     );
   }
 }

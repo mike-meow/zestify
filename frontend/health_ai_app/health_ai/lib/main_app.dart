@@ -35,7 +35,7 @@ class MyApp extends StatelessWidget {
       title: 'Health AI Coach',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      initialRoute: '/health_data_download',  // Start with the health data download screen for testing
+      initialRoute: '/',  // Start with the home screen
       routes: {
         '/': (context) => const HomeScreen(),
         '/file_explorer': (context) => const FileExplorerScreen(),

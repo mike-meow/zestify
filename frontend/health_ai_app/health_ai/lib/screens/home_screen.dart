@@ -23,6 +23,7 @@ class HomeScreen extends StatelessWidget {
               color: AppTheme.textSecondaryColor,
             ),
             onPressed: () {
+              // Use pushNamedAndRemoveUntil to ensure we're not stacking screens
               Navigator.pushNamed(context, '/health_data_download');
             },
             tooltip: 'Download Health Data',

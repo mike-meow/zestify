@@ -49,32 +49,61 @@ async def upload_workout(request: WorkoutUploadRequest) -> WorkoutUploadResponse
     if not workout.id:
         workout.id = str(uuid.uuid4())
 
-    # Load existing workouts
-    workouts_file = user_dir / "workouts.json"
-    workouts = BaseHandler.load_json_file(workouts_file, default=[])
+    # Load existing workout memory
+    workout_memory_file = user_dir / "workout_memory.json"
+    workout_memory = BaseHandler.load_json_file(workout_memory_file, default={
+        "metadata": {
+            "user_id": user_id,
+            "created_at": datetime.now().isoformat(),
+            "last_updated": datetime.now().isoformat(),
+            "version": "1.0"
+        },
+        "workout_memory": {
+            "last_updated": datetime.now().isoformat(),
+            "recent_workouts": [],
+            "workout_patterns": {
+                "frequency": {
+                    "weekly_average": 0,
+                    "most_active_days": [],
+                    "consistency_score": 0
+                },
+                "preferred_times": {
+                    "morning": 0,
+                    "afternoon": 0,
+                    "evening": 0
+                },
+                "performance_trends": {}
+            }
+        }
+    })
 
-    # Check if workout already exists
-    existing_ids = [w.get("id") for w in workouts if "id" in w]
+    # Convert workout to dict and remove None values
+    workout_dict = workout.dict(exclude_none=True)
+
+    # Check if workout already exists in memory
+    existing_workouts = workout_memory.get("workout_memory", {}).get("recent_workouts", [])
+    existing_ids = [w.get("id") for w in existing_workouts if "id" in w]
 
     if workout.id in existing_ids:
         # Update existing workout
-        for i, w in enumerate(workouts):
+        for i, w in enumerate(existing_workouts):
             if w.get("id") == workout.id:
-                # Convert workout to dict and remove None values
-                workout_dict = workout.dict(exclude_none=True)
-                workouts[i] = workout_dict
+                existing_workouts[i] = workout_dict
                 break
     else:
-        # Add new workout
-        # Convert workout to dict and remove None values
-        workout_dict = workout.dict(exclude_none=True)
-        workouts.append(workout_dict)
-
-    # Save updated workouts
-    BaseHandler.save_json_file(workouts_file, workouts)
+        # Add new workout at the beginning of the list
+        existing_workouts.insert(0, workout_dict)
 
     # Update workout memory
-    await _update_workout_memory(user_id, workouts)
+    workout_memory["workout_memory"]["recent_workouts"] = existing_workouts
+    workout_memory["workout_memory"]["last_updated"] = datetime.now().isoformat()
+    workout_memory["metadata"]["last_updated"] = datetime.now().isoformat()
+
+    # Update workout patterns
+    await _update_workout_patterns(workout_memory)
+
+    # Save updated workout memory
+    BaseHandler.save_json_file(workout_memory_file, workout_memory)
 
     logger.info(f"Saved workout for user {user_id} with ID: {workout.id}")
 
@@ -94,15 +123,43 @@ async def upload_workouts(request: WorkoutsUploadRequest) -> WorkoutsUploadRespo
     # Ensure user exists
     user_dir = BaseHandler.ensure_user_exists(user_id)
 
-    # Load existing workouts
-    workouts_file = user_dir / "workouts.json"
-    existing_workouts = BaseHandler.load_json_file(workouts_file, default=[])
+    # Load existing workout memory
+    workout_memory_file = user_dir / "workout_memory.json"
+    workout_memory = BaseHandler.load_json_file(workout_memory_file, default={
+        "metadata": {
+            "user_id": user_id,
+            "created_at": datetime.now().isoformat(),
+            "last_updated": datetime.now().isoformat(),
+            "version": "1.0"
+        },
+        "workout_memory": {
+            "last_updated": datetime.now().isoformat(),
+            "recent_workouts": [],
+            "workout_patterns": {
+                "frequency": {
+                    "weekly_average": 0,
+                    "most_active_days": [],
+                    "consistency_score": 0
+                },
+                "preferred_times": {
+                    "morning": 0,
+                    "afternoon": 0,
+                    "evening": 0
+                },
+                "performance_trends": {}
+            }
+        }
+    })
+
+    # Get existing workouts from memory
+    existing_workouts = workout_memory.get("workout_memory", {}).get("recent_workouts", [])
 
     # Create a map of existing workouts by ID
     existing_workout_map = {w.get("id", ""): w for w in existing_workouts if "id" in w}
 
     # Track workout IDs
     workout_ids = []
+    new_workouts = []
 
     # Process each workout
     for workout in workouts_to_add:
@@ -117,16 +174,28 @@ async def upload_workouts(request: WorkoutsUploadRequest) -> WorkoutsUploadRespo
 
         if workout.id in existing_workout_map:
             # Update existing workout
-            existing_workout_map[workout.id].update(workout_dict)
+            for i, w in enumerate(existing_workouts):
+                if w.get("id") == workout.id:
+                    existing_workouts[i] = workout_dict
+                    break
         else:
-            # Add new workout
-            existing_workouts.append(workout_dict)
+            # Add new workout to our new workouts list
+            new_workouts.append(workout_dict)
 
-    # Save updated workouts
-    BaseHandler.save_json_file(workouts_file, existing_workouts)
+    # Add all new workouts at the beginning of the list
+    if new_workouts:
+        existing_workouts = new_workouts + existing_workouts
 
     # Update workout memory
-    await _update_workout_memory(user_id, existing_workouts)
+    workout_memory["workout_memory"]["recent_workouts"] = existing_workouts
+    workout_memory["workout_memory"]["last_updated"] = datetime.now().isoformat()
+    workout_memory["metadata"]["last_updated"] = datetime.now().isoformat()
+
+    # Update workout patterns
+    await _update_workout_patterns(workout_memory)
+
+    # Save updated workout memory
+    BaseHandler.save_json_file(workout_memory_file, workout_memory)
 
     logger.info(f"Saved {len(workouts_to_add)} workouts for user {user_id}")
 
@@ -138,54 +207,11 @@ async def upload_workouts(request: WorkoutsUploadRequest) -> WorkoutsUploadRespo
         workout_ids=workout_ids
     )
 
-async def _update_workout_memory(user_id: str, workouts: List[Dict[str, Any]]) -> bool:
-    """Update workout memory from workouts data."""
+async def _update_workout_patterns(workout_memory: Dict[str, Any]) -> bool:
+    """Update workout patterns in workout memory."""
     try:
-        # Ensure user exists
-        user_dir = BaseHandler.ensure_user_exists(user_id)
-
-        # Create workout memory file path
-        workout_memory_file = user_dir / "workout_memory.json"
-
-        # Load existing workout memory or create new
-        workout_memory = BaseHandler.load_json_file(workout_memory_file, default={
-            "metadata": {
-                "user_id": user_id,
-                "created_at": datetime.now().isoformat(),
-                "last_updated": datetime.now().isoformat(),
-                "version": "1.0"
-            },
-            "workout_memory": {
-                "last_updated": datetime.now().isoformat(),
-                "recent_workouts": [],
-                "workout_patterns": {
-                    "frequency": {
-                        "weekly_average": 0,
-                        "most_active_days": [],
-                        "consistency_score": 0
-                    },
-                    "preferred_times": {
-                        "morning": 0,
-                        "afternoon": 0,
-                        "evening": 0
-                    },
-                    "performance_trends": {}
-                }
-            }
-        })
-
-        # Sort workouts by date (newest first)
-        sorted_workouts = sorted(
-            workouts,
-            key=lambda w: w.get("start_date", ""),
-            reverse=True
-        )
-
-        # Take only the most recent 20 workouts
-        recent_workouts = sorted_workouts[:20]
-
-        # Update workout memory
-        workout_memory["workout_memory"]["recent_workouts"] = recent_workouts
+        # Get workouts from memory
+        workouts = workout_memory.get("workout_memory", {}).get("recent_workouts", [])
 
         # Update workout patterns if we have enough workouts
         if len(workouts) > 0:
@@ -266,14 +292,7 @@ async def _update_workout_memory(user_id: str, workouts: List[Dict[str, Any]]) -
                 "performance_trends": {}
             }
 
-        # Update timestamps
-        workout_memory["workout_memory"]["last_updated"] = datetime.now().isoformat()
-        workout_memory["metadata"]["last_updated"] = datetime.now().isoformat()
-
-        # Save updated memory
-        BaseHandler.save_json_file(workout_memory_file, workout_memory)
-
         return True
     except Exception as e:
-        logger.error(f"Error updating workout memory: {str(e)}")
+        logger.error(f"Error updating workout patterns: {str(e)}")
         return False

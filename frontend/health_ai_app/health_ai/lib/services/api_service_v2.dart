@@ -153,9 +153,12 @@ class ApiServiceV2 {
       // Add user_id to the request body
       biometricsData['user_id'] = _userId;
 
+      // Log the weight history details
+      _logWeightHistoryDetails(biometricsData);
+
       // Debug: print the request body
       final requestBody = jsonEncode(biometricsData);
-      debugPrint('Biometrics request body: $requestBody');
+      debugPrint('Biometrics request body length: ${requestBody.length}');
 
       final response = await http.post(
         Uri.parse('$_baseUrl/biometrics'),
@@ -175,6 +178,121 @@ class ApiServiceV2 {
     } catch (e) {
       debugPrint('Error uploading biometrics: $e');
       return false;
+    }
+  }
+
+  /// Log detailed information about weight history
+  void _logWeightHistoryDetails(Map<String, dynamic> biometrics) {
+    try {
+      if (biometrics.containsKey('body_composition') && 
+          biometrics['body_composition'] is Map &&
+          biometrics['body_composition'].containsKey('weight')) {
+        
+        final weight = biometrics['body_composition']['weight'];
+        debugPrint('======== WEIGHT DATA SUBMISSION DETAILS ========');
+        debugPrint('Current weight: ${weight['value']} ${weight['unit']} @ ${weight['timestamp']}');
+        
+        if (weight.containsKey('history') && weight['history'] is List) {
+          final history = weight['history'] as List;
+          debugPrint('Total weight history records: ${history.length}');
+          
+          if (history.isEmpty) {
+            debugPrint('WARNING: Weight history array is empty!');
+            return;
+          }
+          
+          // Check if history is actually a proper list of maps
+          if (history.first is! Map) {
+            debugPrint('ERROR: Weight history items are not maps! Type: ${history.first.runtimeType}');
+            return;
+          }
+          
+          // Sort history by date to see the range
+          final List sortedHistory = List.from(history);
+          sortedHistory.sort((a, b) {
+            final aTime = a['timestamp'] ?? '';
+            final bTime = b['timestamp'] ?? '';
+            return aTime.compareTo(bTime);
+          });
+          
+          // Log the date range
+          final oldestEntry = sortedHistory.first;
+          final newestEntry = sortedHistory.last;
+          final dateRange = '${oldestEntry['timestamp']} to ${newestEntry['timestamp']}';
+          debugPrint('Weight data spans: $dateRange');
+          
+          // Log a sample of entries from different time periods
+          debugPrint('=== Sample of weight history entries ===');
+          
+          // Get the first entry
+          debugPrint('Oldest entry: ${oldestEntry['value']} ${oldestEntry['unit']} @ ${oldestEntry['timestamp']}');
+          
+          // Get the most recent entry
+          debugPrint('Newest entry: ${newestEntry['value']} ${newestEntry['unit']} @ ${newestEntry['timestamp']}');
+          
+          // Get some entries in the middle if there are enough
+          if (history.length >= 4) {
+            final middle1Index = history.length ~/ 3;
+            final middle2Index = (history.length * 2) ~/ 3;
+            
+            final middle1 = sortedHistory[middle1Index];
+            final middle2 = sortedHistory[middle2Index];
+            
+            debugPrint('Middle entry 1: ${middle1['value']} ${middle1['unit']} @ ${middle1['timestamp']}');
+            debugPrint('Middle entry 2: ${middle2['value']} ${middle2['unit']} @ ${middle2['timestamp']}');
+          }
+          
+          // Check for duplicate timestamps
+          final Set<String> timestamps = {};
+          int duplicates = 0;
+          
+          for (final entry in history) {
+            final timestamp = entry['timestamp'];
+            if (timestamps.contains(timestamp)) {
+              duplicates++;
+            } else {
+              timestamps.add(timestamp);
+            }
+          }
+          
+          if (duplicates > 0) {
+            debugPrint('WARNING: Found $duplicates duplicate timestamps in weight history');
+          }
+          
+          // Check for valid structure on all entries
+          int malformedEntries = 0;
+          
+          for (final entry in history) {
+            if (!entry.containsKey('value') || 
+                !entry.containsKey('timestamp') || 
+                !entry.containsKey('unit')) {
+              malformedEntries++;
+            } else if (entry['value'] is! num) {
+              malformedEntries++;
+              debugPrint('ERROR: Weight value is not a number: ${entry['value']} (${entry['value'].runtimeType})');
+            }
+          }
+          
+          if (malformedEntries > 0) {
+            debugPrint('WARNING: Found $malformedEntries malformed entries in weight history');
+          }
+          
+          debugPrint('================================================');
+        } else {
+          debugPrint('ERROR: No weight history found in weight data structure');
+          debugPrint('Weight data keys: ${weight.keys.join(', ')}');
+        }
+      } else {
+        debugPrint('ERROR: No weight data found in body composition');
+        if (biometrics.containsKey('body_composition')) {
+          debugPrint('Body composition keys: ${biometrics['body_composition'].keys.join(', ')}');
+        } else {
+          debugPrint('No body_composition key in biometrics');
+          debugPrint('Biometrics keys: ${biometrics.keys.join(', ')}');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error logging weight history: $e');
     }
   }
 
@@ -299,8 +417,88 @@ class ApiServiceV2 {
     }
 
     try {
-      // Create request body with user_id
-      final requestBody = {'user_id': _userId, 'sleep_sessions': sleepSessions};
+      // Create request body with user_id and validate sleep sessions
+      final processedSessions = sleepSessions.map((session) {
+        // Ensure required fields are present
+        if (!session.containsKey('start_date') || 
+            !session.containsKey('end_date') ||
+            !session.containsKey('sleep_stages')) {
+          debugPrint('Sleep session missing required fields: $session');
+          return null; // Skip invalid sessions
+        }
+
+        // Create a new map to avoid modifying the original
+        final processedSession = Map<String, dynamic>.from(session);
+        
+        // Ensure proper duration_seconds field
+        final startDate = DateTime.parse(session['start_date']);
+        final endDate = DateTime.parse(session['end_date']);
+        final durationSeconds = endDate.difference(startDate).inSeconds;
+        
+        processedSession['duration_seconds'] = durationSeconds.toDouble();
+        
+        // Ensure proper duration_minutes field (if missing)
+        if (!processedSession.containsKey('duration_minutes')) {
+          processedSession['duration_minutes'] = (durationSeconds / 60).toDouble();
+        }
+        
+        // Ensure sleep stages have proper enum values
+        if (processedSession['sleep_stages'] is List) {
+          final validStages = ['AWAKE', 'LIGHT', 'DEEP', 'REM', 'IN_BED', 'UNSPECIFIED'];
+          
+          processedSession['sleep_stages'] = (processedSession['sleep_stages'] as List)
+              .map((stage) {
+                if (stage is Map && stage.containsKey('stage_type')) {
+                  // Ensure stage_type is one of the valid values
+                  if (!validStages.contains(stage['stage_type'])) {
+                    stage['stage_type'] = 'UNSPECIFIED';
+                  }
+                  // Ensure duration_minutes is present
+                  if (!stage.containsKey('duration_minutes') && 
+                      stage.containsKey('start_date') && 
+                      stage.containsKey('end_date')) {
+                    final stageStart = DateTime.parse(stage['start_date']);
+                    final stageEnd = DateTime.parse(stage['end_date']);
+                    stage['duration_minutes'] = stageEnd.difference(stageStart).inMinutes.toDouble();
+                  }
+                  return stage;
+                }
+                return null;
+              })
+              .where((stage) => stage != null)
+              .toList();
+        }
+        
+        // Ensure numerical fields are actually numbers
+        ['duration_seconds', 'duration_minutes', 'asleep_minutes', 'awake_minutes', 
+         'in_bed_minutes', 'sleep_efficiency'].forEach((field) {
+          if (processedSession.containsKey(field)) {
+            var value = processedSession[field];
+            if (value is! num) {
+              try {
+                processedSession[field] = double.parse(value.toString());
+              } catch (_) {
+                processedSession[field] = 0.0;
+              }
+            }
+          }
+        });
+        
+        debugPrint('Processed sleep session: ${jsonEncode(processedSession)}');
+        return processedSession;
+      }).where((session) => session != null).toList();
+
+      if (processedSessions.isEmpty) {
+        debugPrint('No valid sleep sessions to upload');
+        return false;
+      }
+
+      final requestBody = {
+        'user_id': _userId,
+        'sleep_sessions': processedSessions,
+      };
+
+      debugPrint('Sending sleep request body: ${jsonEncode(requestBody)}');
 
       final response = await http.post(
         Uri.parse('$_baseUrl/sleep'),
@@ -314,6 +512,7 @@ class ApiServiceV2 {
         return true;
       } else {
         debugPrint('Error uploading sleep sessions: ${response.statusCode}');
+        debugPrint('Response body: ${response.body}');
         return false;
       }
     } catch (e) {
@@ -456,23 +655,151 @@ class ApiServiceV2 {
     // Check for weight
     if (metrics.containsKey('WEIGHT')) {
       final weight = metrics['WEIGHT'];
-      bodyComposition['weight'] = {
-        'value': double.tryParse(weight['value'].toString()) ?? 0,
-        'unit': weight['unit'] ?? 'kg',
-        'timestamp': weight['date'] ?? DateTime.now().toIso8601String(),
-        'source': weight['source'] ?? 'Apple Health',
-      };
+      
+      // Handle weight as both current value and history
+      if (weight is Map && weight.containsKey('value')) {
+        // Single weight value
+        bodyComposition['weight'] = {
+          'value': double.tryParse(weight['value'].toString()) ?? 0,
+          'unit': weight['unit'] ?? 'kg',
+          'timestamp': weight['date'] ?? DateTime.now().toIso8601String(),
+          'source': weight['source'] ?? 'Apple Health',
+        };
+      } else if (weight is Map && weight.containsKey('history')) {
+        // Weight with history
+        List<dynamic> weightHistory = weight['history'] as List<dynamic>;
+        
+        if (weightHistory.isNotEmpty) {
+          // Sort history by timestamp (newest first)
+          weightHistory.sort((a, b) {
+            final aTime = a['timestamp'] ?? '';
+            final bTime = b['timestamp'] ?? '';
+            return bTime.compareTo(aTime);
+          });
+          
+          // Use the latest entry as the current value
+          final latest = weightHistory.first;
+          
+          bodyComposition['weight'] = {
+            'value': double.tryParse(latest['value'].toString()) ?? 0,
+            'unit': latest['unit'] ?? 'kg',
+            'timestamp': latest['timestamp'] ?? DateTime.now().toIso8601String(),
+            'source': latest['source'] ?? 'Apple Health',
+            'history': weightHistory.map((entry) {
+              return {
+                'value': double.tryParse(entry['value'].toString()) ?? 0,
+                'timestamp': entry['timestamp'],
+                'unit': entry['unit'] ?? 'kg',
+                'source': entry['source'] ?? 'Apple Health',
+              };
+            }).toList(),
+          };
+        }
+      } else if (weight is List && weight.isNotEmpty) {
+        // Direct list of weight measurements
+        List<dynamic> weightList = weight;
+        
+        // Sort by timestamp (newest first)
+        weightList.sort((a, b) {
+          final aTime = a['timestamp'] ?? a['date'] ?? '';
+          final bTime = b['timestamp'] ?? b['date'] ?? '';
+          return bTime.compareTo(aTime);
+        });
+        
+        // Use the latest entry as the current value
+        final latest = weightList.first;
+        final timestamp = latest['timestamp'] ?? latest['date'] ?? DateTime.now().toIso8601String();
+        
+        bodyComposition['weight'] = {
+          'value': double.tryParse(latest['value'].toString()) ?? 0,
+          'unit': latest['unit'] ?? 'kg',
+          'timestamp': timestamp,
+          'source': latest['source'] ?? 'Apple Health',
+          'history': weightList.map((entry) {
+            return {
+              'value': double.tryParse(entry['value'].toString()) ?? 0,
+              'timestamp': entry['timestamp'] ?? entry['date'],
+              'unit': entry['unit'] ?? 'kg',
+              'source': entry['source'] ?? 'Apple Health',
+            };
+          }).toList(),
+        };
+      }
     }
 
     // Check for height
     if (metrics.containsKey('HEIGHT')) {
       final height = metrics['HEIGHT'];
-      bodyComposition['height'] = {
-        'value': double.tryParse(height['value'].toString()) ?? 0,
-        'unit': height['unit'] ?? 'cm',
-        'timestamp': height['date'] ?? DateTime.now().toIso8601String(),
-        'source': height['source'] ?? 'Apple Health',
-      };
+      
+      // Handle height in the same way as weight
+      if (height is Map && height.containsKey('value')) {
+        // Single height value
+        bodyComposition['height'] = {
+          'value': double.tryParse(height['value'].toString()) ?? 0,
+          'unit': height['unit'] ?? 'cm',
+          'timestamp': height['date'] ?? DateTime.now().toIso8601String(),
+          'source': height['source'] ?? 'Apple Health',
+        };
+      } else if (height is Map && height.containsKey('history')) {
+        // Height with history
+        List<dynamic> heightHistory = height['history'] as List<dynamic>;
+        
+        if (heightHistory.isNotEmpty) {
+          // Sort history by timestamp (newest first)
+          heightHistory.sort((a, b) {
+            final aTime = a['timestamp'] ?? '';
+            final bTime = b['timestamp'] ?? '';
+            return bTime.compareTo(aTime);
+          });
+          
+          // Use the latest entry as the current value
+          final latest = heightHistory.first;
+          
+          bodyComposition['height'] = {
+            'value': double.tryParse(latest['value'].toString()) ?? 0,
+            'unit': latest['unit'] ?? 'cm',
+            'timestamp': latest['timestamp'] ?? DateTime.now().toIso8601String(),
+            'source': latest['source'] ?? 'Apple Health',
+            'history': heightHistory.map((entry) {
+              return {
+                'value': double.tryParse(entry['value'].toString()) ?? 0,
+                'timestamp': entry['timestamp'],
+                'unit': entry['unit'] ?? 'cm',
+                'source': entry['source'] ?? 'Apple Health',
+              };
+            }).toList(),
+          };
+        }
+      } else if (height is List && height.isNotEmpty) {
+        // Direct list of height measurements
+        List<dynamic> heightList = height;
+        
+        // Sort by timestamp (newest first)
+        heightList.sort((a, b) {
+          final aTime = a['timestamp'] ?? a['date'] ?? '';
+          final bTime = b['timestamp'] ?? b['date'] ?? '';
+          return bTime.compareTo(aTime);
+        });
+        
+        // Use the latest entry as the current value
+        final latest = heightList.first;
+        final timestamp = latest['timestamp'] ?? latest['date'] ?? DateTime.now().toIso8601String();
+        
+        bodyComposition['height'] = {
+          'value': double.tryParse(latest['value'].toString()) ?? 0,
+          'unit': latest['unit'] ?? 'cm',
+          'timestamp': timestamp,
+          'source': latest['source'] ?? 'Apple Health',
+          'history': heightList.map((entry) {
+            return {
+              'value': double.tryParse(entry['value'].toString()) ?? 0,
+              'timestamp': entry['timestamp'] ?? entry['date'],
+              'unit': entry['unit'] ?? 'cm',
+              'source': entry['source'] ?? 'Apple Health',
+            };
+          }).toList(),
+        };
+      }
     }
 
     // Check for body fat percentage

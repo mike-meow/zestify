@@ -47,13 +47,22 @@ class UserCreateResponse(ApiResponse):
 
 # ==================== BIOMETRICS ENDPOINTS ====================
 
-class BiometricMeasurement(BaseModel):
-    """A single biometric measurement with value, unit, and timestamp"""
+class BiometricHistoryEntry(BaseModel):
+    """A single entry in the history of a biometric measurement"""
     value: float
     unit: str
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
     source: SourceType = SourceType.MANUAL
     notes: Optional[str] = None
+
+class BiometricMeasurement(BaseModel):
+    """A biometric measurement with value, unit, timestamp, and optional history"""
+    value: float
+    unit: str
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+    source: SourceType = SourceType.MANUAL
+    notes: Optional[str] = None
+    history: Optional[List[BiometricHistoryEntry]] = None
 
 
 class BodyCompositionData(BaseModel):
@@ -209,19 +218,20 @@ class ActivityUploadResponse(ApiResponse):
 
 class SleepStage(str, Enum):
     """Sleep stages"""
-    AWAKE = "Awake"
-    LIGHT = "Light"
-    DEEP = "Deep"
+    AWAKE = "AWAKE"
+    LIGHT = "LIGHT"
+    DEEP = "DEEP"
     REM = "REM"
-    UNSPECIFIED = "Unspecified"
+    IN_BED = "IN_BED"
+    UNSPECIFIED = "UNSPECIFIED"
 
 
 class SleepStageData(BaseModel):
     """Data for a single sleep stage"""
-    stage: SleepStage
+    stage_type: SleepStage  # Changed from 'stage' to 'stage_type' to match request
     start_date: str  # ISO format timestamp
     end_date: str  # ISO format timestamp
-    duration_seconds: float
+    duration_minutes: float  # Changed from duration_seconds to duration_minutes
 
 
 class SleepData(BaseModel):
@@ -237,6 +247,12 @@ class SleepData(BaseModel):
     heart_rate_max: Optional[float] = None
     respiratory_rate_average: Optional[float] = None
     notes: Optional[str] = None
+    # Additional fields to match the request structure
+    duration_minutes: Optional[float] = None
+    asleep_minutes: Optional[float] = None
+    awake_minutes: Optional[float] = None
+    in_bed_minutes: Optional[float] = None
+    sleep_efficiency: Optional[float] = None
 
     @field_validator('end_date')
     def end_date_after_start_date(cls, v, info):
