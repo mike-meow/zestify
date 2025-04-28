@@ -1,4 +1,4 @@
-from backend.services.openrouter_client import OpenRouterClient, MODELS
+from backend.llm.openrouter_client import OpenRouterClient, MODELS
 from typing import List, Dict, Any, Optional
 import json
 

@@ -22,7 +22,7 @@ MEMORY_TEMPLATES_DIR = REPO_ROOT / "memory_templates"
 if not MEMORY_TEMPLATES_DIR.exists():
     # Fall back to the old location
     MEMORY_TEMPLATES_DIR = REPO_ROOT / "services" / "memory_templates"
-MEMORY_UTILS_PATH = REPO_ROOT / "services" / "memory_utils.jsonnet"
+MEMORY_UTILS_PATH = REPO_ROOT / "memory" / "memory_utils.jsonnet"
 
 # Ensure jsonnet is installed
 try:

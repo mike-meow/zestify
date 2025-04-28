@@ -12,7 +12,7 @@ import yaml
 
 from backend.schemas.user_profile import UserProfile
 from backend.prompts.onboarding_conversation import SYSTEM_PROMPT, ConversationTurn
-from backend.services.openrouter_client import OpenRouterClient
+from backend.llm.openrouter_client import OpenRouterClient
 
 # Configure logging
 logging.basicConfig(

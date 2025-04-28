@@ -81,13 +81,13 @@ async def upload_workout(request: WorkoutUploadRequest) -> WorkoutUploadResponse
     workout_dict = workout.dict(exclude_none=True)
 
     # Check if workout already exists in memory
-    existing_workouts = workout_memory.get("workout_memory", {}).get("recent_workouts", [])
-    existing_ids = [w.get("id") for w in existing_workouts if "id" in w]
+    existing_workouts = workout_memory.recent_workouts
+    existing_ids = [w.id for w in existing_workouts if hasattr(w, 'id')]
 
     if workout.id in existing_ids:
         # Update existing workout
         for i, w in enumerate(existing_workouts):
-            if w.get("id") == workout.id:
+            if getattr(w, 'id', None) == workout.id:
                 existing_workouts[i] = workout_dict
                 break
     else:
@@ -95,15 +95,14 @@ async def upload_workout(request: WorkoutUploadRequest) -> WorkoutUploadResponse
         existing_workouts.insert(0, workout_dict)
 
     # Update workout memory
-    workout_memory["workout_memory"]["recent_workouts"] = existing_workouts
-    workout_memory["workout_memory"]["last_updated"] = datetime.now().isoformat()
-    workout_memory["metadata"]["last_updated"] = datetime.now().isoformat()
+    workout_memory.recent_workouts = existing_workouts
+    workout_memory.last_updated = datetime.now().isoformat()
 
-    # Update workout patterns
-    await _update_workout_patterns(workout_memory)
+    # Update workout patterns (convert to dict for compatibility)
+    await _update_workout_patterns({"workout_memory": workout_memory.model_dump()})
 
-    # Save updated workout memory
-    BaseHandler.save_json_file(workout_memory_file, workout_memory)
+    # Save updated workout memory in new flat format
+    BaseHandler.save_json_file(workout_memory_file, workout_memory.model_dump())
 
     logger.info(f"Saved workout for user {user_id} with ID: {workout.id}")
 
@@ -123,39 +122,39 @@ async def upload_workouts(request: WorkoutsUploadRequest) -> WorkoutsUploadRespo
     # Ensure user exists
     user_dir = BaseHandler.ensure_user_exists(user_id)
 
-    # Load existing workout memory
+    # Load existing workout memory in new flat format
     workout_memory_file = user_dir / "workout_memory.json"
-    workout_memory = BaseHandler.load_json_file(workout_memory_file, default={
-        "metadata": {
-            "user_id": user_id,
-            "created_at": datetime.now().isoformat(),
-            "last_updated": datetime.now().isoformat(),
-            "version": "1.0"
-        },
-        "workout_memory": {
-            "last_updated": datetime.now().isoformat(),
-            "recent_workouts": [],
-            "workout_patterns": {
-                "frequency": {
-                    "weekly_average": 0,
-                    "most_active_days": [],
-                    "consistency_score": 0
-                },
-                "preferred_times": {
-                    "morning": 0,
-                    "afternoon": 0,
-                    "evening": 0
-                },
-                "performance_trends": {}
+    from backend.memory.schemas import WorkoutMemory
+    try:
+        workout_memory = WorkoutMemory.model_validate(
+            BaseHandler.load_json_file(workout_memory_file, default={
+                "user_id": user_id,
+                "last_updated": datetime.now().isoformat(),
+                "recent_workouts": [],
+                "workout_patterns": {},
+                "workout_goals": {}
+            })
+        )
+    except Exception:
+        legacy = BaseHandler.load_json_file(workout_memory_file, default={})
+        # Migrate legacy format if needed
+        if "metadata" in legacy and "workout_memory" in legacy:
+            migrated = {
+                "user_id": legacy["metadata"].get("user_id", user_id),
+                "last_updated": legacy["workout_memory"].get("last_updated", datetime.now().isoformat()),
+                "recent_workouts": legacy["workout_memory"].get("recent_workouts", []),
+                "workout_patterns": legacy["workout_memory"].get("workout_patterns", {}),
+                "workout_goals": legacy["workout_memory"].get("workout_goals", {})
             }
-        }
-    })
+            workout_memory = WorkoutMemory.model_validate(migrated)
+        else:
+            workout_memory = WorkoutMemory.model_validate(legacy)
 
     # Get existing workouts from memory
-    existing_workouts = workout_memory.get("workout_memory", {}).get("recent_workouts", [])
+    existing_workouts = workout_memory.recent_workouts
 
     # Create a map of existing workouts by ID
-    existing_workout_map = {w.get("id", ""): w for w in existing_workouts if "id" in w}
+    existing_workout_map = {getattr(w, 'id', None): w for w in existing_workouts if hasattr(w, 'id')}
 
     # Track workout IDs
     workout_ids = []
@@ -175,7 +174,7 @@ async def upload_workouts(request: WorkoutsUploadRequest) -> WorkoutsUploadRespo
         if workout.id in existing_workout_map:
             # Update existing workout
             for i, w in enumerate(existing_workouts):
-                if w.get("id") == workout.id:
+                if getattr(w, 'id', None) == workout.id:
                     existing_workouts[i] = workout_dict
                     break
         else:
@@ -187,15 +186,14 @@ async def upload_workouts(request: WorkoutsUploadRequest) -> WorkoutsUploadRespo
         existing_workouts = new_workouts + existing_workouts
 
     # Update workout memory
-    workout_memory["workout_memory"]["recent_workouts"] = existing_workouts
-    workout_memory["workout_memory"]["last_updated"] = datetime.now().isoformat()
-    workout_memory["metadata"]["last_updated"] = datetime.now().isoformat()
+    workout_memory.recent_workouts = existing_workouts
+    workout_memory.last_updated = datetime.now().isoformat()
 
-    # Update workout patterns
-    await _update_workout_patterns(workout_memory)
+    # Update workout patterns (convert to dict for compatibility)
+    await _update_workout_patterns({"workout_memory": workout_memory.model_dump()})
 
-    # Save updated workout memory
-    BaseHandler.save_json_file(workout_memory_file, workout_memory)
+    # Save updated workout memory in new flat format
+    BaseHandler.save_json_file(workout_memory_file, workout_memory.model_dump())
 
     logger.info(f"Saved {len(workouts_to_add)} workouts for user {user_id}")
 

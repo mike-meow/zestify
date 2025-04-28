@@ -10,6 +10,12 @@ import json
 import requests
 from typing import Dict, List, Any, Optional, Union
 import logging
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+env_path = Path('.') / '.env'
+load_dotenv(dotenv_path=env_path)
 
 # Configure logging
 logging.basicConfig(
@@ -20,12 +26,16 @@ logger = logging.getLogger(__name__)
 
 # Model configuration
 MODELS = {
-    "gemini": "google/gemini-2.5-pro-exp-03-25:free",
+    # Using Gemini 2.0 Flash Experimental as the default
+    "gemini": "google/gemini-2.0-flash-exp:free",
+    "gemini-pro": "google/gemini-2.5-pro-preview-03-25",  # Paid tier
+    "gemini-flash": "google/gemini-2.5-flash-preview",    # Alternative option
+    "gemini-thinking": "google/gemini-2.5-flash-preview:thinking",  # With thinking tokens
     "deepseek": "deepseek/deepseek-chat-v3-0324:free",
     "claude": "anthropic/claude-3-sonnet-20240229"
 }
 
-DEFAULT_MODEL = MODELS["gemini"]
+DEFAULT_MODEL = MODELS["deepseek"]
 
 class OpenRouterClient:
     """Client for interacting with the OpenRouter API."""
@@ -37,15 +47,21 @@ class OpenRouterClient:
         Initialize the OpenRouter client.
         
         Args:
-            api_key: OpenRouter API key. If not provided, will look for OPENROUTER_API_KEY env variable.
+            api_key: OpenRouter API key. If not provided, will look for OPENROUTER_API_KEY in .env file.
             model: Model to use. If not provided, will use DEFAULT_MODEL.
         """
-        self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY")
+        # First try the provided API key, then .env file's OPENROUTER_API_KEY
+        self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
         if not self.api_key:
-            logger.warning("No API key provided. Please set OPENROUTER_API_KEY environment variable or pass api_key.")
+            logger.warning("No API key provided. Please set OPENROUTER_API_KEY in your .env file or pass api_key.")
         
-        self.default_model = model or DEFAULT_MODEL
-        logger.debug(f"Using model: {self.default_model}")
+        # Convert model key to full OpenRouter model ID if needed
+        if model in MODELS:
+            self.default_model = MODELS[model]
+        else:
+            self.default_model = model or DEFAULT_MODEL
+            
+        logger.debug(f"Initialized with model ID: {self.default_model}")
         
         self.session = requests.Session()
         self.session.headers.update({
@@ -77,7 +93,7 @@ class OpenRouterClient:
         messages: List[Dict[str, str]],
         model: Optional[str] = None,
         temperature: float = 0.7,
-        max_tokens: int = 1000,
+        max_tokens: int = 2000,
         stream: bool = False,
         additional_params: Optional[Dict[str, Any]] = None
     ) -> Union[Dict[str, Any], requests.Response]:
@@ -98,36 +114,88 @@ class OpenRouterClient:
         """
         url = f"{self.BASE_URL}/chat/completions"
         
+        # Determine which model to use, with proper ID conversion
+        model_to_use = self.default_model
+        if model is not None:
+            # Convert the model name to its full ID if it's in our list
+            if model in MODELS:
+                model_to_use = MODELS[model]
+            else:
+                # Otherwise use it directly (assuming it's already a valid model ID)
+                model_to_use = model
+        
+        logger.debug(f"Using OpenRouter model ID: {model_to_use}")
+        
         payload = {
-            "model": model or self.default_model,
+            "model": model_to_use,
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
             "stream": stream
         }
 
-        logger.debug(f"Using model: {payload['model']}")
-        logger.debug(f"Sending payload: {json.dumps(payload, indent=2)}")
+        logger.debug(f"Using model ID: {payload['model']}")
+        
+        # For debugging, limit the content display length in logs but show message count
+        debug_messages = []
+        for msg in messages:
+            content = msg.get('content', '')
+            content_preview = content[:100] + "..." if len(content) > 100 else content
+            debug_messages.append({
+                "role": msg.get('role', 'unknown'),
+                "content_length": len(content),
+                "content_preview": content_preview
+            })
+        
+        logger.debug(f"Sending {len(messages)} messages to OpenRouter:")
+        for i, msg in enumerate(debug_messages):
+            logger.debug(f"  Message {i+1}: role={msg['role']}, length={msg['content_length']}")
+            logger.debug(f"    Preview: {msg['content_preview']}")
         
         # Add any additional parameters
         if additional_params:
             payload.update(additional_params)
         
         try:
+            logger.debug(f"Making API request to: {url}")
             if stream:
                 response = self.session.post(url, json=payload, stream=True)
                 response.raise_for_status()
                 return response
             else:
                 response = self.session.post(url, json=payload)
-                response.raise_for_status()
+                
+                # Log response status and headers before raising exception
                 logger.debug(f"Response status code: {response.status_code}")
                 logger.debug(f"Response headers: {response.headers}")
-                logger.debug(f"Raw response text: {response.text}")
+                
+                # For 4xx/5xx responses, log more details
+                if not response.ok:
+                    logger.error(f"Error response: {response.status_code} {response.reason}")
+                    try:
+                        error_details = response.json()
+                        logger.error(f"Error details: {json.dumps(error_details, indent=2)}")
+                    except:
+                        logger.error(f"Error response text: {response.text}")
+                
+                response.raise_for_status()
                 return response.json()
         except requests.exceptions.RequestException as e:
-            logger.error(f"Error creating chat completion: {e}")
-            return {"error": str(e)}
+            error_msg = str(e)
+            logger.error(f"Error creating chat completion: {error_msg}")
+            
+            # Add more context to the error message
+            if hasattr(e, 'response') and e.response is not None:
+                try:
+                    error_details = e.response.json()
+                    logger.error(f"API error details: {json.dumps(error_details, indent=2)}")
+                    error_msg = f"{error_msg} - {json.dumps(error_details)}"
+                except:
+                    if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                        logger.error(f"API error response: {e.response.text}")
+                        error_msg = f"{error_msg} - {e.response.text}"
+            
+            return {"error": error_msg}
     
     def process_stream(self, response: requests.Response) -> str:
         """

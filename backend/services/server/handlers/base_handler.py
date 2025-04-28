@@ -74,7 +74,7 @@ class BaseHandler:
             os.makedirs(file_path.parent, exist_ok=True)
             
             with open(file_path, "w") as f:
-                json.dump(data, f, indent=2)
+                json.dump(data, f, indent=2, default=json_serial)
             
             return True
         except Exception as e:

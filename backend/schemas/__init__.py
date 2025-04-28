@@ -1,1 +1,0 @@
-"""Zestify schema definitions.""" 
