@@ -30,27 +30,13 @@ def cli():
               default='deepseek',
               help='LLM model to use for conversation (default: deepseek)')
 def onboard(debug: bool, model: str) -> None:
-    """Start the onboarding process to create your wellness profile.
-    
-    Available models:
-      - deepseek: DeepSeek Chat v3 (default, good all-purpose model)
-      - gemini: Google Gemini 2.0 Flash (fast, efficient)
-      - gemini-pro: Google Gemini 2.5 Pro (more capable but costs credits)
-      - claude: Anthropic Claude 3 Sonnet (excellent for detailed responses)
     """
-    if not os.getenv("OPENROUTER_API_KEY"):
-        click.secho("Error: OPENROUTER_API_KEY is not set in your .env file", fg="red")
-        return
-
-    if debug:
-        logger.setLevel(logging.DEBUG)
-
-    # Import here to avoid circular imports
-    from backend.services.onboarding import OnboardingConversation
-
-    click.secho(f"Using {model} model for conversation", fg="blue")
-    conversation = OnboardingConversation(debug=debug, model=model)
-    conversation.run()
+    [DEPRECATED] Start the onboarding process to create your wellness profile.
+    
+    This command is deprecated. Please use 'chat --onboarding' instead.
+    """
+    click.secho("This command is deprecated. Please use 'chat --onboarding' instead.", fg="yellow")
+    click.secho("Example: zestify chat USER_ID --onboarding --model claude", fg="yellow")
 
 @cli.command()
 @click.option('--host', default='0.0.0.0', help='Host to bind the server to')
@@ -200,7 +186,8 @@ def memory_overview(user_id: str, workout_start_date: str, compact: bool):
 @click.option('--model', type=click.Choice(['gemini', 'gemini-pro', 'gemini-thinking', 'deepseek', 'claude']), 
               default='deepseek',
               help='LLM model to use for chat (default: deepseek)')
-def chat(user_id: str, debug: bool, model: str) -> None:
+@click.option('--onboarding', is_flag=True, help='Run in onboarding mode to gather user information')
+def chat(user_id: str, debug: bool, model: str, onboarding: bool) -> None:
     """Start an interactive chat session with your AI health coach.
     
     Available models:
@@ -208,6 +195,9 @@ def chat(user_id: str, debug: bool, model: str) -> None:
       - gemini: Google Gemini 2.0 Flash (fast, efficient)
       - gemini-pro: Google Gemini 2.5 Pro (more capable but costs credits)
       - claude: Anthropic Claude 3 Sonnet (excellent for detailed responses)
+      
+    Add the --onboarding flag to switch to onboarding mode, which focuses on gathering
+    user information and setting up a fitness profile.
     """
     if not os.getenv("OPENROUTER_API_KEY"):
         click.secho("Error: OPENROUTER_API_KEY is not set in your .env file", fg="red")
@@ -223,7 +213,7 @@ def chat(user_id: str, debug: bool, model: str) -> None:
         logger.debug("Debug mode enabled - verbose logging activated")
 
     # Import necessary components
-    from backend.prompts.chat import Chat, ChatRole
+    from backend.prompts.chat import Chat, Onboarding, ChatRole
     from backend.memory.manager import OverviewMemoryManager
     import json
 
@@ -233,12 +223,35 @@ def chat(user_id: str, debug: bool, model: str) -> None:
         mm = OverviewMemoryManager(user_id)
         memory = mm.get_compact_memory()
         
-        # Initialize chat with specified model
-        chat = Chat(memory=memory, model=model)
+        # Initialize chat based on mode
+        if onboarding:
+            chat_instance = Onboarding(memory=memory, model=model)
+            mode_name = "Onboarding Mode"
+            
+            # Print onboarding introduction
+            click.secho("\n=== Health & Fitness Onboarding ===", fg="green", bold=True)
+            click.secho("This session will help gather information to create your personalized fitness plan.", fg="green")
+            click.secho("Answer the questions or type 'exit' to finish early.\n", fg="green")
+            
+            # Start with an initial greeting
+            initial_response = chat_instance.process_user_input("I want to start my fitness journey")
+            click.secho(f"Coach: {initial_response.message}", fg="cyan")
+            
+            # Display options if available
+            if initial_response.options:
+                click.secho("\nOptions:", fg="yellow")
+                for i, option in enumerate(initial_response.options):
+                    click.secho(f"{i+1}. {option}", fg="yellow")
+        else:
+            chat_instance = Chat(memory=memory, model=model)
+            mode_name = "Chat Mode"
+            
+            # Print chat introduction
+            click.secho(f"AI Health Coach initialized using {model} model. Type 'exit' or 'quit' to end the session.", fg="green")
+            click.secho("Type 'tokens' to see token counts for the last exchange.", fg="green")
         
-        # Add a system message
-        click.secho(f"AI Health Coach initialized using {model} model. Type 'exit' or 'quit' to end the session.", fg="green")
-        click.secho("Type 'tokens' to see token counts for the last exchange.", fg="green")
+        # Log selected mode and model
+        logger.info(f"Starting chat in {mode_name} with {model} model")
         
         last_token_info = None
         
@@ -248,60 +261,82 @@ def chat(user_id: str, debug: bool, model: str) -> None:
             user_input = click.prompt("\nYou", prompt_suffix="> ", type=str)
             
             # Check for exit commands
-            if user_input.lower() in ['exit', 'quit', 'bye']:
-                click.secho("Goodbye!", fg="blue")
+            if user_input.lower() in ["exit", "quit", "q"]:
                 break
                 
-            # Check for special commands
-            if user_input.lower() == 'tokens':
-                if last_token_info:
-                    click.secho(f"Last exchange:", fg="cyan")
-                    click.secho(f"  Prompt tokens: {last_token_info['prompt_tokens']}", fg="cyan")
-                    click.secho(f"  Response tokens: {last_token_info['response_tokens']}", fg="cyan")
-                    click.secho(f"  Total tokens: {last_token_info['total_tokens']}", fg="cyan")
-                else:
-                    click.secho("No token information available yet", fg="yellow")
-                continue
+            # Check for token info request
+            if user_input.lower() == "tokens" and last_token_info:
+                prompt_tokens, completion_tokens = last_token_info
+                total_tokens = prompt_tokens + completion_tokens if completion_tokens else prompt_tokens
                 
-            # Process user input
-            try:
-                start = datetime.now()
-                # No need to specify model here since it's already set on the Chat instance
-                response = chat.process_user_input(user_input, temperature=0.7)
-                end = datetime.now()
-                duration = (end - start).total_seconds()
+                click.secho("\nToken usage for last exchange:", fg="blue")
+                click.secho(f"  Prompt tokens: {prompt_tokens}", fg="white")
+                click.secho(f"  Completion tokens: {completion_tokens if completion_tokens else 'unknown'}", fg="white")
+                click.secho(f"  Total tokens: {total_tokens if completion_tokens else 'unknown'}", fg="white")
                 
-                # Display response
-                click.secho(f"\nCoach ({duration:.2f}s)", fg="green", bold=True)
-                click.echo(response.message)
+                continue  # Skip processing and go to next loop iteration
                 
-                # Save token info
-                last_token_info = {
-                    'prompt_tokens': response.prompt_tokens,
-                    'response_tokens': response.token_count,
-                    'total_tokens': (response.prompt_tokens or 0) + (response.token_count or 0)
-                }
+            # Process the user input
+            response = chat_instance.process_user_input(user_input)
+            
+            # Store token info for potential display later
+            last_token_info = (response.prompt_tokens or 0, response.token_count)
+            
+            # Display the response
+            click.secho(f"\nCoach: {response.message}", fg="cyan")
+            
+            # For onboarding mode, display options if available
+            if onboarding and response.options:
+                click.secho("\nOptions:", fg="yellow")
+                for i, option in enumerate(response.options):
+                    click.secho(f"{i+1}. {option}", fg="yellow")
+            
+            # For onboarding mode, display memory update information
+            if onboarding and response.memory_updated:
+                click.secho("\n[Your profile has been updated with this information]", fg="green")
                 
-                # Show memory update if any
-                if response.memory_updated:
-                    click.secho(f"\n[Memory updated with {len(response.memory_patch)} operations]", fg="blue")
-                    if debug:
-                        for op in response.memory_patch:
-                            path = op.get('path', '')
-                            op_type = op.get('op', '')
-                            value_preview = str(op.get('value', ''))[:30]
-                            if len(str(op.get('value', ''))) > 30:
-                                value_preview += "..."
-                            click.secho(f"  {op_type} {path}: {value_preview}", fg="cyan")
-            except Exception as e:
-                click.secho(f"Error: {str(e)}", fg="red")
-
+            if debug:
+                if response.prompt_tokens:
+                    click.secho(f"Prompt tokens: {response.prompt_tokens}", fg="blue")
+                if response.token_count:
+                    click.secho(f"Response tokens: {response.token_count}", fg="blue")
+        
+        # For onboarding mode, show a summary at the end
+        if onboarding:
+            click.secho("\n=== Your Fitness Profile Summary ===", fg="green", bold=True)
+            
+            # Get specific sections that are most relevant
+            memory_dict = chat_instance.memory.model_dump()
+            
+            # Show workout goals
+            if memory_dict.get("workout_memory", {}).get("workout_goals", {}).get("current_goals"):
+                click.secho("\nYour Fitness Goals:", fg="green")
+                for goal in memory_dict["workout_memory"]["workout_goals"]["current_goals"]:
+                    click.secho(f"- {goal.get('goal', 'Unknown goal')}", fg="white")
+            
+            # Show workout preferences if they exist
+            if memory_dict.get("workout_memory", {}).get("workout_preferences"):
+                click.secho("\nYour Workout Preferences:", fg="green")
+                preferences = memory_dict["workout_memory"]["workout_preferences"]
+                for key, value in preferences.items():
+                    click.secho(f"- {key}: {value}", fg="white")
+            
+            # Show health conditions if they exist
+            if memory_dict.get("medical_history", {}).get("conditions"):
+                click.secho("\nHealth Considerations:", fg="green")
+                for condition in memory_dict["medical_history"]["conditions"]:
+                    click.secho(f"- {condition.get('name', 'Unknown condition')}", fg="white")
+            
+            click.secho("\nOnboarding completed! Your personalized fitness plan is ready.", fg="green", bold=True)
+                            
+        # Save the updated memory
+        click.secho("\nSaving updated memory...", fg="blue")
+        mm.save_compact_memory(chat_instance.memory)
+        click.secho("Memory saved successfully.", fg="green")
+        
     except Exception as e:
-        logger.error(f"Error in chat: {str(e)}")
-        click.secho(f"Error: {e}", fg="red")
-        if debug:
-            import traceback
-            click.secho(traceback.format_exc(), fg="red")
+        logger.error(f"Error in chat session: {str(e)}", exc_info=True)
+        click.secho(f"Error: {str(e)}", fg="red")
 
 @cli.command()
 @click.option('--verbose', is_flag=True, help='Show detailed model information')
@@ -367,8 +402,13 @@ def list_models(verbose: bool):
         click.secho(traceback.format_exc(), fg="red")
 
 def main():
-    """Entry point for the Zestify CLI."""
-    cli()
+    """Main entry point for the CLI."""
+    try:
+        cli()
+    except Exception as e:
+        click.secho(f"Error: {str(e)}", fg="red")
+        # Use --debug for more detailed error information
+        logger.error(f"CLI error: {str(e)}", exc_info=True)
 
 if __name__ == "__main__":
     main()
