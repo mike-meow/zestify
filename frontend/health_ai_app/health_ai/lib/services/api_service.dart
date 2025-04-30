@@ -126,23 +126,27 @@ class ApiService {
     }
   }
 
-  /// Upload biometrics data to the server
+  /// Upload biometrics data to the server (Legacy: assumes user_id in URL)
   Future<bool> uploadBiometrics(Map<String, dynamic> biometricsData) async {
-    if (!isInitialized) {
-      debugPrint('API service not initialized');
-      return false;
-    }
-
-    if (_userId == null) {
-      debugPrint('No user ID available');
+    if (!isInitialized || _userId == null) {
+      debugPrint('API service not initialized or User ID missing');
       return false;
     }
 
     try {
+      // This version uses the new endpoint structure with user_id in body and data wrapper
+      final requestData = {
+        'user_id': _userId,
+        'data': biometricsData, // Wrap the original data
+      };
+      
+      final requestBody = jsonEncode(requestData);
+      debugPrint('[Legacy API Shim] Sending to /biometrics with wrapped data');
+
       final response = await http.post(
-        Uri.parse('$_baseUrl/users/$_userId/biometrics'),
+        Uri.parse('$_baseUrl/biometrics'), // Use the new unified endpoint
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(biometricsData),
+        body: requestBody,
       );
 
       if (response.statusCode == 200) {
@@ -151,6 +155,7 @@ class ApiService {
         return true;
       } else {
         debugPrint('Error uploading biometrics: ${response.statusCode}');
+        debugPrint('Response body: ${response.body}'); // Log error
         return false;
       }
     } catch (e) {
@@ -159,20 +164,23 @@ class ApiService {
     }
   }
 
-  /// Upload health data directly to the server
+  /// Upload health data directly to the server (Legacy Endpoint - Deprecate?)
+  /// This endpoint seems less structured. Consider migrating to specific uploads.
   Future<bool> uploadHealthData(Map<String, dynamic> healthData) async {
-    if (!isInitialized) {
-      debugPrint('API service not initialized');
+     if (!isInitialized || _userId == null) {
+      debugPrint('API service not initialized or User ID missing');
       return false;
     }
 
-    if (_userId == null) {
-      debugPrint('No user ID available');
-      return false;
-    }
+    // TODO: This endpoint is problematic. It sends a mixed bag of data.
+    // Ideally, the caller should process this data and call the specific 
+    // upload functions (uploadWorkouts, uploadBiometrics, uploadActivities etc.)
+    // For now, we can try to forward it, but it might fail on the backend 
+    // if there isn't a handler specifically for `/users/{user_id}/health-data`
+    debugPrint('WARNING: Calling legacy /users/$_userId/health-data endpoint. Consider refactoring to use specific upload methods.');
 
     try {
-      debugPrint('Uploading health data to server...');
+      debugPrint('Uploading health data via legacy endpoint...');
       final response = await http.post(
         Uri.parse('$_baseUrl/users/$_userId/health-data'),
         headers: {'Content-Type': 'application/json'},
@@ -181,109 +189,60 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        debugPrint('Health data uploaded successfully: ${data['message']}');
+        debugPrint('Health data (legacy) uploaded successfully: ${data['message']}');
         return true;
       } else {
-        debugPrint('Error uploading health data: ${response.statusCode}');
+        debugPrint('Error uploading health data (legacy): ${response.statusCode}');
+        debugPrint('Response body: ${response.body}');
         return false;
       }
     } catch (e) {
-      debugPrint('Error uploading health data: $e');
+      debugPrint('Error uploading health data (legacy): $e');
       return false;
     }
   }
 
-  /// Update health metrics memory
+  // --- Deprecated Memory Update Endpoints --- 
+  // These directly manipulated memory files, which is now handled by the main upload endpoints.
+  // Mark them as deprecated or remove if no longer used.
+  
+  @Deprecated('Use specific upload endpoints like uploadBiometrics, uploadWorkouts, etc.')
   Future<bool> updateHealthMetrics(Map<String, dynamic> metrics) async {
-    if (!isInitialized) {
-      debugPrint('API service not initialized');
-      return false;
-    }
-
-    if (_userId == null) {
-      debugPrint('No user ID available');
-      return false;
-    }
-
-    try {
-      debugPrint('Updating health metrics memory...');
-      final response = await http.post(
-        Uri.parse('$_baseUrl/users/$_userId/memory/health-metrics'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(metrics),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        debugPrint('Health metrics updated: ${data['message']}');
-        return true;
-      } else {
-        debugPrint('Error updating health metrics: ${response.statusCode}');
-        return false;
-      }
-    } catch (e) {
-      debugPrint('Error updating health metrics: $e');
-      return false;
-    }
+    debugPrint('DEPRECATED: updateHealthMetrics called. Use specific upload endpoints.');
+    // Optionally, try to map `metrics` to a specific upload call if possible.
+    // For now, return false or attempt a legacy call if one exists.
+    return false; 
   }
 
-  /// Update biometrics memory
+  @Deprecated('Use uploadBiometrics instead.')
   Future<bool> updateBiometrics(Map<String, dynamic> biometrics) async {
-    if (!isInitialized) {
-      debugPrint('API service not initialized');
-      return false;
-    }
-
-    if (_userId == null) {
-      debugPrint('No user ID available');
-      return false;
-    }
-
-    try {
-      debugPrint('Updating biometrics memory...');
-      final response = await http.post(
-        Uri.parse('$_baseUrl/users/$_userId/memory/biometrics'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(biometrics),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        debugPrint('Biometrics updated: ${data['message']}');
-        return true;
-      } else {
-        debugPrint('Error updating biometrics: ${response.statusCode}');
-        return false;
-      }
-    } catch (e) {
-      debugPrint('Error updating biometrics: $e');
-      return false;
-    }
+    debugPrint('DEPRECATED: updateBiometrics called. Use uploadBiometrics instead.');
+    // Forward to the new uploadBiometrics method
+    return uploadBiometrics(biometrics);
   }
 
-  /// Add a workout to memory
+  @Deprecated('Use uploadWorkout or uploadWorkouts instead.')
   Future<bool> addWorkout(Map<String, dynamic> workout) async {
-    if (!isInitialized) {
-      debugPrint('API service not initialized');
-      return false;
-    }
-
-    if (_userId == null) {
-      debugPrint('No user ID available');
+    debugPrint('DEPRECATED: addWorkout called. Use uploadWorkout instead.');
+    // Create the structure expected by the new single workout endpoint
+    final requestData = {
+      'user_id': _userId,
+      'workout': workout, 
+    };
+    
+    if (!isInitialized || _userId == null) {
+      debugPrint('API service not initialized or User ID missing');
       return false;
     }
 
     try {
-      final url = '$_baseUrl/users/$_userId/memory/workout/add';
-      debugPrint('Adding workout to memory...');
-      debugPrint('URL: $url');
-      debugPrint('User ID: $_userId');
-      debugPrint('Workout data: ${jsonEncode(workout)}');
-
+      final url = '$_baseUrl/workouts'; // Use the new endpoint
+      debugPrint('[Legacy API Shim] Adding workout via /workouts...');
+      
       final response = await http.post(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(workout),
+        body: jsonEncode(requestData), // Send wrapped data
       );
 
       debugPrint('Response status code: ${response.statusCode}');
@@ -291,59 +250,32 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        debugPrint('Workout added: ${data['message']}');
+        debugPrint('Workout added (via shim): ${data['message']}');
         return true;
       } else {
-        debugPrint('Error adding workout: ${response.statusCode}');
+        debugPrint('Error adding workout (via shim): ${response.statusCode}');
         debugPrint('Error response: ${response.body}');
         return false;
       }
     } catch (e) {
-      debugPrint('Error adding workout: $e');
+      debugPrint('Error adding workout (via shim): $e');
       return false;
     }
   }
 
-  /// Upload health data in chunks
+  // --- Deprecated Chunk Upload Endpoint --- 
+  @Deprecated('Use specific batch upload endpoints like uploadWorkouts, uploadActivities etc.')
   Future<bool> uploadHealthDataChunk(
     String dataType,
     List<dynamic> dataChunk,
   ) async {
-    if (!isInitialized) {
-      debugPrint('API service not initialized');
-      return false;
-    }
-
-    if (_userId == null) {
-      debugPrint('No user ID available');
-      return false;
-    }
-
-    try {
-      debugPrint('Uploading $dataType chunk with ${dataChunk.length} items...');
-      final response = await http.post(
-        Uri.parse('$_baseUrl/users/$_userId/health-data/chunk'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'data_type': dataType,
-          'data': dataChunk,
-          'timestamp': DateTime.now().toIso8601String(),
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        debugPrint(
-          'Health data chunk uploaded successfully: ${data['message']}',
-        );
-        return true;
-      } else {
-        debugPrint('Error uploading health data chunk: ${response.statusCode}');
-        return false;
-      }
-    } catch (e) {
-      debugPrint('Error uploading health data chunk: $e');
-      return false;
-    }
+    debugPrint('DEPRECATED: uploadHealthDataChunk called. Use specific batch upload endpoints.');
+    // Determine the correct batch endpoint based on dataType and call it.
+    // Example:
+    // if (dataType == 'WORKOUT') {
+    //   return uploadWorkouts(List<Map<String, dynamic>>.from(dataChunk));
+    // } else if (dataType == 'ACTIVITY') { ... }
+    // For now, return false.
+    return false;
   }
 }

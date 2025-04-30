@@ -270,14 +270,19 @@ class Workout extends BaseModel {
   static WorkoutType _mapAppleWorkoutType(String? appleWorkoutType) {
     if (appleWorkoutType == null) return WorkoutType.other;
 
-    // Print the workout type for debugging
-    debugPrint('Mapping workout type: $appleWorkoutType');
+    // Normalize to lowercase for case-insensitive matching
+    final String typeLower = appleWorkoutType.toLowerCase();
 
-    // Direct mapping from HealthWorkoutActivityType enum values
-    // These are the exact values from the health package
-    switch (appleWorkoutType.toLowerCase()) {
+    // Log the normalized type being mapped
+    debugPrint('Mapping workout type (normalized): $typeLower from original: $appleWorkoutType');
+
+    // Direct mapping from HealthWorkoutActivityType enum strings (or common variations)
+    switch (typeLower) {
       case 'running':
       case 'run':
+      case 'running_jogging': // Added common variation
+      case 'running_sand': // Added from user data
+      case 'running_treadmill': // Added from user data
         return WorkoutType.running;
 
       case 'walking':
@@ -300,9 +305,16 @@ class Workout extends BaseModel {
       case 'yoga':
         return WorkoutType.yoga;
 
-      case 'strength_training':
+      // --- Explicit Strength Training Variations --- 
+      case 'strength_training': // Generic term
       case 'traditional_strength_training':
+      case 'weight_lifting': // Common alternative term
         return WorkoutType.traditionalStrengthTraining;
+      case 'functional_strength_training':
+        return WorkoutType.functionalTraining;
+      case 'core_training':
+        return WorkoutType.coreTraining;
+      // --- End Strength --- 
 
       case 'high_intensity_interval_training':
       case 'hiit':
@@ -314,12 +326,6 @@ class Workout extends BaseModel {
       case 'dance':
       case 'dancing':
         return WorkoutType.dance;
-
-      case 'functional_strength_training':
-        return WorkoutType.functionalTraining;
-
-      case 'core_training':
-        return WorkoutType.coreTraining;
 
       case 'flexibility':
         return WorkoutType.flexibility;
@@ -334,49 +340,114 @@ class Workout extends BaseModel {
       case 'rowing':
       case 'row':
         return WorkoutType.rowing;
+        
+      // Add other explicit types found in logs or known from HealthKit
+      case 'basketball': // Added from user data logs if available
+        // Decide if this maps to 'other' or a new category if needed
+        debugPrint('Mapping specific type \'basketball\' to other for now.');
+        return WorkoutType.other; // Or create a specific enum if desired
 
       default:
-        // Fallback to string matching if direct mapping fails
-        if (appleWorkoutType.toLowerCase().contains('run')) {
-          return WorkoutType.running;
-        } else if (appleWorkoutType.toLowerCase().contains('walk')) {
-          return WorkoutType.walking;
-        } else if (appleWorkoutType.toLowerCase().contains('cycl') ||
-            appleWorkoutType.toLowerCase().contains('bik')) {
-          return WorkoutType.cycling;
-        } else if (appleWorkoutType.toLowerCase().contains('swim')) {
-          return WorkoutType.swimming;
-        } else if (appleWorkoutType.toLowerCase().contains('hik')) {
-          return WorkoutType.hiking;
-        } else if (appleWorkoutType.toLowerCase().contains('yoga')) {
-          return WorkoutType.yoga;
-        } else if (appleWorkoutType.toLowerCase().contains('strength')) {
+        // Temporarily simplified to isolate the error
+        debugPrint('Unknown workout type: $appleWorkoutType, defaulting to other');
+        return WorkoutType.other;
+        
+        /* --- Original Fallback Logic --- 
+        // Fallback: Check if the original string contains keywords
+        // Use the *original* non-lowercased string for potential specific names
+        // that might lose meaning in lowercase (though unlikely here)
+        // Keep using typeLower for contains checks for simplicity unless needed
+        
+        debugPrint('Workout type \'$typeLower\' not in direct map, trying fallback...');
+        
+        if (typeLower.contains('strength') || typeLower.contains('weight')) {
+          debugPrint('Fallback mapping \'$typeLower\' to traditionalStrengthTraining');
           return WorkoutType.traditionalStrengthTraining;
-        } else if (appleWorkoutType.toLowerCase().contains('interval') ||
-            appleWorkoutType.toLowerCase().contains('hiit')) {
+        } else if (typeLower.contains('run')) {
+          debugPrint('Fallback mapping \'$typeLower\' to running');
+          return WorkoutType.running;
+        } else if (typeLower.contains('walk')) {
+          debugPrint('Fallback mapping \'$typeLower\' to walking');
+          return WorkoutType.walking;
+        } else if (typeLower.contains('cycl') || typeLower.contains('bik')) {
+           debugPrint('Fallback mapping \'$typeLower\' to cycling');
+          return WorkoutType.cycling;
+        } else if (typeLower.contains('swim')) {
+           debugPrint('Fallback mapping \'$typeLower\' to swimming');
+          return WorkoutType.swimming;
+        } else if (typeLower.contains('hik')) {
+           debugPrint('Fallback mapping \'$typeLower\' to hiking');
+          return WorkoutType.hiking;
+        } else if (typeLower.contains('yoga')) {
+           debugPrint('Fallback mapping \'$typeLower\' to yoga');
+          return WorkoutType.yoga;
+        } else if (typeLower.contains('interval') || typeLower.contains('hiit')) {
+           debugPrint('Fallback mapping \'$typeLower\' to highIntensityIntervalTraining');
           return WorkoutType.highIntensityIntervalTraining;
-        } else if (appleWorkoutType.toLowerCase().contains('pilates')) {
+        } else if (typeLower.contains('pilates')) {
+           debugPrint('Fallback mapping \'$typeLower\' to pilates');
           return WorkoutType.pilates;
-        } else if (appleWorkoutType.toLowerCase().contains('danc')) {
+        } else if (typeLower.contains('danc')) {
+           debugPrint('Fallback mapping \'$typeLower\' to dance');
           return WorkoutType.dance;
-        } else if (appleWorkoutType.toLowerCase().contains('function')) {
+        } else if (typeLower.contains('function')) {
+           debugPrint('Fallback mapping \'$typeLower\' to functionalTraining');
           return WorkoutType.functionalTraining;
-        } else if (appleWorkoutType.toLowerCase().contains('core')) {
+        } else if (typeLower.contains('core')) {
+           debugPrint('Fallback mapping \'$typeLower\' to coreTraining');
           return WorkoutType.coreTraining;
-        } else if (appleWorkoutType.toLowerCase().contains('flex')) {
+        } else if (typeLower.contains('flex')) {
+           debugPrint('Fallback mapping \'$typeLower\' to flexibility');
           return WorkoutType.flexibility;
-        } else if (appleWorkoutType.toLowerCase().contains('elliptical')) {
+        } else if (typeLower.contains('elliptical')) {
+           debugPrint('Fallback mapping \'$typeLower\' to elliptical');
           return WorkoutType.elliptical;
-        } else if (appleWorkoutType.toLowerCase().contains('stair')) {
+        } else if (typeLower.contains('stair')) {
+           debugPrint('Fallback mapping \'$typeLower\' to stairClimbing');
           return WorkoutType.stairClimbing;
-        } else if (appleWorkoutType.toLowerCase().contains('row')) {
+        } else if (typeLower.contains('row')) {
+           debugPrint('Fallback mapping \'$typeLower\' to rowing');
           return WorkoutType.rowing;
         } else {
-          debugPrint(
-            'Unknown workout type: $appleWorkoutType, defaulting to other',
-          );
+          // Final fallback if no specific case or keyword matched
+          debugPrint('Unknown workout type: $appleWorkoutType (normalized: $typeLower), defaulting to other');
           return WorkoutType.other;
         }
+       --- End Original Fallback Logic --- */
+    }
+  }
+
+  /// Static method to map Apple Health workout type string to the API string format
+  static String mapAppleWorkoutTypeToString(String? appleWorkoutType) {
+    if (appleWorkoutType == null) return 'Other'; // Default API string
+
+    // Use the existing enum mapping logic first
+    final mappedEnum = _mapAppleWorkoutType(appleWorkoutType);
+    
+    // Convert the mapped enum back to the desired API string format
+    switch (mappedEnum) {
+      case WorkoutType.running: return 'Running';
+      case WorkoutType.walking: return 'Walking';
+      case WorkoutType.cycling: return 'Cycling';
+      case WorkoutType.swimming: return 'Swimming';
+      case WorkoutType.hiking: return 'Hiking';
+      case WorkoutType.yoga: return 'Yoga';
+      // Map both Strength types to the same API string for simplicity now, 
+      // backend preserves original via original_type anyway
+      case WorkoutType.strengthTraining:
+      case WorkoutType.traditionalStrengthTraining: 
+        return 'Strength Training'; 
+      case WorkoutType.highIntensityIntervalTraining: return 'HIIT';
+      case WorkoutType.pilates: return 'Pilates';
+      case WorkoutType.dance: return 'Dance';
+      case WorkoutType.functionalTraining: return 'Functional Training';
+      case WorkoutType.coreTraining: return 'Core Training';
+      case WorkoutType.flexibility: return 'Flexibility';
+      case WorkoutType.elliptical: return 'Elliptical';
+      case WorkoutType.stairClimbing: return 'Stair Climbing';
+      case WorkoutType.rowing: return 'Rowing';
+      case WorkoutType.other: return 'Other';
+      // No default needed as all enum values are covered
     }
   }
 

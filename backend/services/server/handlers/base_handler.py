@@ -5,7 +5,7 @@ Base handler for all API endpoints.
 import os
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, date
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
@@ -13,6 +13,13 @@ from fastapi import APIRouter, HTTPException, Depends
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+# Helper function for JSON serialization
+def json_serial(obj):
+    """JSON serializer for objects not serializable by default json code"""
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    raise TypeError (f"Type {type(obj)} not serializable")
 
 # Set up paths
 REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent

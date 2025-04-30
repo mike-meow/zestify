@@ -11,23 +11,6 @@ base + {
     // Recent workouts
     recent_workouts: [],
     
-    // Workout patterns
-    workout_patterns: {
-      frequency: {
-        weekly_average: 0,
-        most_active_days: [],
-        consistency_score: 0,
-      },
-      
-      preferred_times: {
-        morning: 0,
-        afternoon: 0,
-        evening: 0,
-      },
-      
-      performance_trends: {},
-    },
-    
     // Workout goals
     workout_goals: {
       current_goals: [],
@@ -73,36 +56,6 @@ base + {
     addWorkout(workout):: self + {
       recent_workouts: [workout] + self.recent_workouts,
       last_updated: std.extVar('timestamp'),
-    },
-    
-    // Method to analyze workout patterns
-    analyzePatterns(workouts):: self + {
-      // This would be a complex function to analyze workout patterns
-      // For now, we'll just provide a placeholder
-      workout_patterns: {
-        frequency: {
-          weekly_average: 4.2,  // Example value
-          most_active_days: ["Monday", "Wednesday", "Saturday"],
-          consistency_score: 85,
-        },
-        preferred_times: {
-          morning: 65,
-          afternoon: 10,
-          evening: 25,
-        },
-        performance_trends: {
-          running: {
-            pace_trend: "improving",
-            distance_trend: "stable",
-            heart_rate_trend: "improving",
-          },
-          cycling: {
-            speed_trend: "improving",
-            distance_trend: "improving",
-            heart_rate_trend: "stable",
-          },
-        },
-      },
     },
   },
   

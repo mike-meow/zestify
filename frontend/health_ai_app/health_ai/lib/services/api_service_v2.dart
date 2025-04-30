@@ -139,26 +139,23 @@ class ApiServiceV2 {
 
   /// Upload biometrics data to the server
   Future<bool> uploadBiometrics(Map<String, dynamic> biometricsData) async {
-    if (!isInitialized) {
-      debugPrint('API service not initialized');
-      return false;
-    }
-
-    if (_userId == null) {
-      debugPrint('No user ID available');
+    if (!isInitialized || _userId == null) {
+      debugPrint('API service not initialized or User ID missing');
       return false;
     }
 
     try {
-      // Add user_id to the request body
-      biometricsData['user_id'] = _userId;
+      // Wrap the data according to the new API definition
+      final requestData = {
+        'user_id': _userId,
+        'data': biometricsData, // Embed the original data under 'data' key
+      };
 
-      // Log the weight history details
-      _logWeightHistoryDetails(biometricsData);
+      _logWeightHistoryDetails(biometricsData); // Log details from original data
 
-      // Debug: print the request body
-      final requestBody = jsonEncode(biometricsData);
+      final requestBody = jsonEncode(requestData);
       debugPrint('Biometrics request body length: ${requestBody.length}');
+      // debugPrint('Biometrics request body: $requestBody'); // Uncomment for debugging
 
       final response = await http.post(
         Uri.parse('$_baseUrl/biometrics'),
@@ -298,24 +295,25 @@ class ApiServiceV2 {
 
   /// Upload a single workout to the server
   Future<bool> uploadWorkout(Map<String, dynamic> workoutData) async {
-    if (!isInitialized) {
-      debugPrint('API service not initialized');
-      return false;
-    }
-
-    if (_userId == null) {
-      debugPrint('No user ID available');
+    if (!isInitialized || _userId == null) {
+      debugPrint('API service not initialized or User ID missing');
       return false;
     }
 
     try {
-      // Create request body with user_id
-      final requestBody = {'user_id': _userId, 'workout': workoutData};
+      // Wrap the data according to the new API definition
+      final requestData = {
+        'user_id': _userId,
+        'workout': workoutData, // Use 'workout' key as per API definition
+      };
+
+      final requestBody = jsonEncode(requestData);
+      // debugPrint('Workout request body: $requestBody'); // Uncomment for debugging
 
       final response = await http.post(
         Uri.parse('$_baseUrl/workouts'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(requestBody),
+        body: requestBody,
       );
 
       if (response.statusCode == 200) {
@@ -324,6 +322,7 @@ class ApiServiceV2 {
         return true;
       } else {
         debugPrint('Error uploading workout: ${response.statusCode}');
+        debugPrint('Response body: ${response.body}'); // Log error response
         return false;
       }
     } catch (e) {
@@ -334,24 +333,25 @@ class ApiServiceV2 {
 
   /// Upload multiple workouts to the server
   Future<bool> uploadWorkouts(List<Map<String, dynamic>> workouts) async {
-    if (!isInitialized) {
-      debugPrint('API service not initialized');
-      return false;
-    }
-
-    if (_userId == null) {
-      debugPrint('No user ID available');
+    if (!isInitialized || _userId == null) {
+      debugPrint('API service not initialized or User ID missing');
       return false;
     }
 
     try {
-      // Create request body with user_id
-      final requestBody = {'user_id': _userId, 'workouts': workouts};
+      // Wrap the data according to the new API definition
+      final requestData = {
+        'user_id': _userId,
+        'workouts': workouts, // Use 'workouts' key as per API definition
+      };
+
+      final requestBody = jsonEncode(requestData);
+      // debugPrint('Workouts batch request body: $requestBody'); // Uncomment for debugging
 
       final response = await http.post(
         Uri.parse('$_baseUrl/workouts/batch'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(requestBody),
+        body: requestBody,
       );
 
       if (response.statusCode == 200) {
@@ -360,6 +360,7 @@ class ApiServiceV2 {
         return true;
       } else {
         debugPrint('Error uploading workouts: ${response.statusCode}');
+        debugPrint('Response body: ${response.body}'); // Log error response
         return false;
       }
     } catch (e) {
@@ -370,24 +371,25 @@ class ApiServiceV2 {
 
   /// Upload daily activity data to the server
   Future<bool> uploadActivities(List<Map<String, dynamic>> activities) async {
-    if (!isInitialized) {
-      debugPrint('API service not initialized');
-      return false;
-    }
-
-    if (_userId == null) {
-      debugPrint('No user ID available');
+     if (!isInitialized || _userId == null) {
+      debugPrint('API service not initialized or User ID missing');
       return false;
     }
 
     try {
-      // Create request body with user_id
-      final requestBody = {'user_id': _userId, 'activities': activities};
+      // Wrap the data according to the new API definition
+      final requestData = {
+        'user_id': _userId,
+        'activities': activities, // Use 'activities' key as per API definition
+      };
+
+      final requestBody = jsonEncode(requestData);
+      // debugPrint('Activities request body: $requestBody'); // Uncomment for debugging
 
       final response = await http.post(
         Uri.parse('$_baseUrl/activities'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(requestBody),
+        body: requestBody,
       );
 
       if (response.statusCode == 200) {
@@ -396,6 +398,7 @@ class ApiServiceV2 {
         return true;
       } else {
         debugPrint('Error uploading activities: ${response.statusCode}');
+        debugPrint('Response body: ${response.body}'); // Log error response
         return false;
       }
     } catch (e) {
@@ -406,86 +409,58 @@ class ApiServiceV2 {
 
   /// Upload sleep data to the server
   Future<bool> uploadSleep(List<Map<String, dynamic>> sleepSessions) async {
-    if (!isInitialized) {
-      debugPrint('API service not initialized');
-      return false;
-    }
-
-    if (_userId == null) {
-      debugPrint('No user ID available');
+    if (!isInitialized || _userId == null) {
+      debugPrint('API service not initialized or User ID missing');
       return false;
     }
 
     try {
-      // Create request body with user_id and validate sleep sessions
+      // Pre-process sessions (existing logic seems okay)
       final processedSessions = sleepSessions.map((session) {
-        // Ensure required fields are present
-        if (!session.containsKey('start_date') || 
+         // ... (keep existing pre-processing logic for sleep data) ...
+          if (!session.containsKey('start_date') || 
             !session.containsKey('end_date') ||
             !session.containsKey('sleep_stages')) {
-          debugPrint('Sleep session missing required fields: $session');
-          return null; // Skip invalid sessions
-        }
-
-        // Create a new map to avoid modifying the original
-        final processedSession = Map<String, dynamic>.from(session);
-        
-        // Ensure proper duration_seconds field
-        final startDate = DateTime.parse(session['start_date']);
-        final endDate = DateTime.parse(session['end_date']);
-        final durationSeconds = endDate.difference(startDate).inSeconds;
-        
-        processedSession['duration_seconds'] = durationSeconds.toDouble();
-        
-        // Ensure proper duration_minutes field (if missing)
-        if (!processedSession.containsKey('duration_minutes')) {
-          processedSession['duration_minutes'] = (durationSeconds / 60).toDouble();
-        }
-        
-        // Ensure sleep stages have proper enum values
-        if (processedSession['sleep_stages'] is List) {
-          final validStages = ['AWAKE', 'LIGHT', 'DEEP', 'REM', 'IN_BED', 'UNSPECIFIED'];
-          
-          processedSession['sleep_stages'] = (processedSession['sleep_stages'] as List)
-              .map((stage) {
-                if (stage is Map && stage.containsKey('stage_type')) {
-                  // Ensure stage_type is one of the valid values
-                  if (!validStages.contains(stage['stage_type'])) {
-                    stage['stage_type'] = 'UNSPECIFIED';
+            debugPrint('Sleep session missing required fields: $session');
+            return null;
+          }
+          final processedSession = Map<String, dynamic>.from(session);
+          final startDate = DateTime.parse(session['start_date']);
+          final endDate = DateTime.parse(session['end_date']);
+          final durationSeconds = endDate.difference(startDate).inSeconds;
+          processedSession['duration_seconds'] = durationSeconds.toDouble();
+          if (!processedSession.containsKey('duration_minutes')) {
+            processedSession['duration_minutes'] = (durationSeconds / 60).toDouble();
+          }
+          if (processedSession['sleep_stages'] is List) {
+            final validStages = ['AWAKE', 'LIGHT', 'DEEP', 'REM', 'IN_BED', 'UNSPECIFIED'];
+            processedSession['sleep_stages'] = (processedSession['sleep_stages'] as List)
+                .map((stage) {
+                  if (stage is Map && stage.containsKey('stage_type')) {
+                    if (!validStages.contains(stage['stage_type'])) {
+                      stage['stage_type'] = 'UNSPECIFIED';
+                    }
+                    if (!stage.containsKey('duration_minutes') && stage.containsKey('start_date') && stage.containsKey('end_date')) {
+                      final stageStart = DateTime.parse(stage['start_date']);
+                      final stageEnd = DateTime.parse(stage['end_date']);
+                      stage['duration_minutes'] = stageEnd.difference(stageStart).inMinutes.toDouble();
+                    }
+                    return stage;
                   }
-                  // Ensure duration_minutes is present
-                  if (!stage.containsKey('duration_minutes') && 
-                      stage.containsKey('start_date') && 
-                      stage.containsKey('end_date')) {
-                    final stageStart = DateTime.parse(stage['start_date']);
-                    final stageEnd = DateTime.parse(stage['end_date']);
-                    stage['duration_minutes'] = stageEnd.difference(stageStart).inMinutes.toDouble();
-                  }
-                  return stage;
-                }
-                return null;
-              })
-              .where((stage) => stage != null)
-              .toList();
-        }
-        
-        // Ensure numerical fields are actually numbers
-        ['duration_seconds', 'duration_minutes', 'asleep_minutes', 'awake_minutes', 
-         'in_bed_minutes', 'sleep_efficiency'].forEach((field) {
-          if (processedSession.containsKey(field)) {
-            var value = processedSession[field];
-            if (value is! num) {
-              try {
-                processedSession[field] = double.parse(value.toString());
-              } catch (_) {
-                processedSession[field] = 0.0;
+                  return null;
+                })
+                .where((stage) => stage != null)
+                .toList();
+          }
+          ['duration_seconds', 'duration_minutes', 'asleep_minutes', 'awake_minutes', 'in_bed_minutes', 'sleep_efficiency'].forEach((field) {
+            if (processedSession.containsKey(field)) {
+              var value = processedSession[field];
+              if (value is! num) {
+                try { processedSession[field] = double.parse(value.toString()); } catch (_) { processedSession[field] = 0.0; }
               }
             }
-          }
-        });
-        
-        debugPrint('Processed sleep session: ${jsonEncode(processedSession)}');
-        return processedSession;
+          });
+          return processedSession;
       }).where((session) => session != null).toList();
 
       if (processedSessions.isEmpty) {
@@ -493,17 +468,20 @@ class ApiServiceV2 {
         return false;
       }
 
-      final requestBody = {
+      // Wrap the data according to the new API definition
+      final requestData = {
         'user_id': _userId,
-        'sleep_sessions': processedSessions,
+        'sleep_sessions': processedSessions, // Use 'sleep_sessions' key
       };
 
-      debugPrint('Sending sleep request body: ${jsonEncode(requestBody)}');
+      final requestBody = jsonEncode(requestData);
+      debugPrint('Sending sleep request body length: ${requestBody.length}');
+      // debugPrint('Sleep request body: $requestBody'); // Uncomment for debugging
 
       final response = await http.post(
         Uri.parse('$_baseUrl/sleep'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(requestBody),
+        body: requestBody,
       );
 
       if (response.statusCode == 200) {
@@ -512,7 +490,7 @@ class ApiServiceV2 {
         return true;
       } else {
         debugPrint('Error uploading sleep sessions: ${response.statusCode}');
-        debugPrint('Response body: ${response.body}');
+        debugPrint('Response body: ${response.body}'); // Log error response
         return false;
       }
     } catch (e) {
@@ -525,27 +503,25 @@ class ApiServiceV2 {
   Future<bool> uploadNutrition(
     List<Map<String, dynamic>> nutritionEntries,
   ) async {
-    if (!isInitialized) {
-      debugPrint('API service not initialized');
-      return false;
-    }
-
-    if (_userId == null) {
-      debugPrint('No user ID available');
+    if (!isInitialized || _userId == null) {
+      debugPrint('API service not initialized or User ID missing');
       return false;
     }
 
     try {
-      // Create request body with user_id
-      final requestBody = {
+      // Wrap the data according to the new API definition
+      final requestData = {
         'user_id': _userId,
-        'nutrition_entries': nutritionEntries,
+        'nutrition_entries': nutritionEntries, // Use 'nutrition_entries' key
       };
+
+      final requestBody = jsonEncode(requestData);
+      // debugPrint('Nutrition request body: $requestBody'); // Uncomment for debugging
 
       final response = await http.post(
         Uri.parse('$_baseUrl/nutrition'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(requestBody),
+        body: requestBody,
       );
 
       if (response.statusCode == 200) {
@@ -554,6 +530,7 @@ class ApiServiceV2 {
         return true;
       } else {
         debugPrint('Error uploading nutrition entries: ${response.statusCode}');
+        debugPrint('Response body: ${response.body}'); // Log error response
         return false;
       }
     } catch (e) {

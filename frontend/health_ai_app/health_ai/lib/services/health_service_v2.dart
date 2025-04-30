@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:health/health.dart';
 import 'package:health_ai/services/api_service_v2.dart';
 import 'package:health_ai/services/biometrics_fetcher.dart';
+import 'package:health_ai/models/workout/workout.dart';
 
 /// Source type for health data
 enum SourceType { appleHealth, manual, device, other }
@@ -177,25 +178,6 @@ class HealthServiceV2 {
     }
   }
 
-  /// Map workout type from HealthKit to our API format
-  String _mapWorkoutType(String healthKitWorkoutType) {
-    // Map HealthKit workout types to our API workout types
-    final Map<String, String> workoutTypeMap = {
-      'RUNNING': 'Running',
-      'WALKING': 'Walking',
-      'CYCLING': 'Cycling',
-      'SWIMMING': 'Swimming',
-      'STRENGTH_TRAINING': 'Strength Training',
-      'HIIT': 'HIIT',
-      'YOGA': 'Yoga',
-      'PILATES': 'Pilates',
-      'DANCE': 'Dance',
-      'HIKING': 'Hiking',
-    };
-
-    return workoutTypeMap[healthKitWorkoutType] ?? 'Other';
-  }
-
   /// Fetch and process workouts using chunked fetching for better reliability
   Future<List<Map<String, dynamic>>> _fetchAndProcessWorkouts(
     DateTime startDate,
@@ -283,22 +265,18 @@ class HealthServiceV2 {
         }
 
         final workoutValue = dataPoint.value as WorkoutHealthValue;
+        final rawWorkoutType = workoutValue.workoutActivityType.name;
 
         // Skip workouts with no duration
         if (dataPoint.dateTo.difference(dataPoint.dateFrom).inSeconds <= 0) {
           continue;
         }
 
-        // Create a unique ID for the workout
-        final workoutId =
-            '${dataPoint.dateFrom.millisecondsSinceEpoch}_${workoutValue.workoutActivityType.name}';
-
-        // Create workout data
+        // Create workout data map, sending the raw type string in both fields
         final workoutData = {
-          'id': workoutId,
-          'workout_type': _mapWorkoutType(
-            workoutValue.workoutActivityType.name,
-          ),
+          'id': dataPoint.dateFrom.millisecondsSinceEpoch.toString(),
+          'workout_type': rawWorkoutType,
+          'original_type': rawWorkoutType,
           'start_date': dataPoint.dateFrom.toIso8601String(),
           'end_date': dataPoint.dateTo.toIso8601String(),
           'duration_seconds':

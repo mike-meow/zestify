@@ -69,7 +69,7 @@ def main():
     
     # Initial message to start the onboarding process
     print("Starting onboarding process...")
-    response = onboarding.process_user_input("Hi, I'm new here and want to start my fitness journey")
+    response = onboarding.chat("Hi, I'm new here and want to start my fitness journey")
     
     # Display the response
     print(f"\nCoach: {response.message}")
@@ -92,7 +92,7 @@ def main():
             break
         
         # Process user input
-        response = onboarding.process_user_input(user_input)
+        response = onboarding.chat(user_input)
         
         # Display the response
         print(f"\nCoach: {response.message}")

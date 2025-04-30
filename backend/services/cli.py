@@ -26,13 +26,13 @@ def cli():
 
 @cli.command()
 @click.option('--debug', is_flag=True, help='Show debug information and LLM outputs')
-@click.option('--model', type=click.Choice(['gemini', 'gemini-pro', 'gemini-thinking', 'deepseek', 'claude']), 
+@click.option('--model', type=click.Choice(['gemini', 'gemini-pro', 'gemini-thinking', 'deepseek', 'claude']),
               default='deepseek',
               help='LLM model to use for conversation (default: deepseek)')
 def onboard(debug: bool, model: str) -> None:
     """
     [DEPRECATED] Start the onboarding process to create your wellness profile.
-    
+
     This command is deprecated. Please use 'chat --onboarding' instead.
     """
     click.secho("This command is deprecated. Please use 'chat --onboarding' instead.", fg="yellow")
@@ -160,7 +160,7 @@ def memory_overview(user_id: str, workout_start_date: str, compact: bool):
     import json
     try:
         mm = OverviewMemoryManager(user_id, workout_start_date=workout_start_date)
-        
+
         if compact:
             # Get the compact memory representation for LLM consumption
             memory_data = mm.get_compact_memory()
@@ -170,12 +170,12 @@ def memory_overview(user_id: str, workout_start_date: str, compact: bool):
             # Get the full memory representation
             memory = mm.load_memory()
             memory_dict = memory.model_dump()
-            
+
         def json_serial(obj):
             if isinstance(obj, datetime):
                 return obj.isoformat()
             return str(obj)
-            
+
         click.secho(json.dumps(memory_dict, indent=2, default=json_serial), fg="cyan")
     except Exception as e:
         click.secho(f"Error: {e}", fg="red")
@@ -183,19 +183,19 @@ def memory_overview(user_id: str, workout_start_date: str, compact: bool):
 @cli.command()
 @click.argument('user_id')
 @click.option('--debug', is_flag=True, help='Show debug information including token counts')
-@click.option('--model', type=click.Choice(['gemini', 'gemini-pro', 'gemini-thinking', 'deepseek', 'claude']), 
+@click.option('--model', type=click.Choice(['gemini', 'gemini-pro', 'gemini-thinking', 'deepseek', 'claude']),
               default='deepseek',
               help='LLM model to use for chat (default: deepseek)')
 @click.option('--onboarding', is_flag=True, help='Run in onboarding mode to gather user information')
 def chat(user_id: str, debug: bool, model: str, onboarding: bool) -> None:
     """Start an interactive chat session with your AI health coach.
-    
+
     Available models:
       - deepseek: DeepSeek Chat v3 (default, good all-purpose model)
       - gemini: Google Gemini 2.0 Flash (fast, efficient)
       - gemini-pro: Google Gemini 2.5 Pro (more capable but costs credits)
       - claude: Anthropic Claude 3 Sonnet (excellent for detailed responses)
-      
+
     Add the --onboarding flag to switch to onboarding mode, which focuses on gathering
     user information and setting up a fitness profile.
     """
@@ -218,122 +218,112 @@ def chat(user_id: str, debug: bool, model: str, onboarding: bool) -> None:
     import json
 
     try:
-        # Initialize memory
-        click.secho(f"Loading memory for user: {user_id}", fg="blue")
+        # Initialize memory manager (this will create user dir if needed)
+        click.secho(f"Initializing memory manager for user: {user_id}", fg="blue")
         mm = OverviewMemoryManager(user_id)
-        memory = mm.get_compact_memory()
-        
-        # Initialize chat based on mode
+
+        # Load memory - This will now handle missing files/dirs gracefully
+        click.secho("Loading memory...", fg="blue")
+        try:
+            # load_memory now returns a potentially partially filled OverallMemory
+            memory = mm.load_memory()
+            if memory.user_profile: # Check if profile was successfully loaded/created
+                 click.secho("Memory loaded successfully.", fg="green")
+            else:
+                 click.secho("Memory loaded, but UserProfile is missing (could not determine user_id?).", fg="yellow")
+                 # Decide if we should proceed without a user profile or exit?
+                 # For now, let's allow proceeding, but the chat might be limited.
+        except Exception as load_err: # Catch broader errors during loading/validation
+            logger.error(f"Critical error loading memory: {load_err}", exc_info=True)
+            click.secho(f"Critical error loading memory: {load_err}. Exiting.", fg="red")
+            return # Exit if loading fundamentally failed
+
+        # Initialize chat based on mode using the potentially partial OverallMemory
         if onboarding:
+            # Check if user profile exists, essential for onboarding
+            if not memory.user_profile:
+                 click.secho("Cannot start onboarding without a user profile. Please ensure user_id is available.", fg="red")
+                 return
             chat_instance = Onboarding(memory=memory, model=model)
             mode_name = "Onboarding Mode"
-            
-            # Print onboarding introduction
+            # ... (onboarding intro)
             click.secho("\n=== Health & Fitness Onboarding ===", fg="green", bold=True)
             click.secho("This session will help gather information to create your personalized fitness plan.", fg="green")
             click.secho("Answer the questions or type 'exit' to finish early.\n", fg="green")
-            
             # Start with an initial greeting
-            initial_response = chat_instance.process_user_input("I want to start my fitness journey")
-            click.secho(f"Coach: {initial_response.message}", fg="cyan")
-            
-            # Display options if available
-            if initial_response.options:
-                click.secho("\nOptions:", fg="yellow")
-                for i, option in enumerate(initial_response.options):
-                    click.secho(f"{i+1}. {option}", fg="yellow")
-        else:
-            chat_instance = Chat(memory=memory, model=model)
+            # Check if we need to provide initial context or just start
+            initial_prompt = "Start onboarding" # Simple starting prompt
+            if memory.user_profile.name:
+                 initial_prompt = f"Start onboarding for {memory.user_profile.name}"
+
+            initial_response = chat_instance.chat(initial_prompt)
+            click.secho(f"Coach: {initial_response.get('message', 'No response')}", fg="cyan")
+            if 'options' in initial_response and initial_response['options']:
+                 click.secho("\nOptions:", fg="yellow")
+                 for i, option in enumerate(initial_response['options']):
+                      click.secho(f"{i+1}. {option}", fg="yellow")
+
+        else: # Regular chat mode
+            chat_instance = Chat(memory=memory, model=model, debug=debug)
             mode_name = "Chat Mode"
-            
-            # Print chat introduction
             click.secho(f"AI Health Coach initialized using {model} model. Type 'exit' or 'quit' to end the session.", fg="green")
             click.secho("Type 'tokens' to see token counts for the last exchange.", fg="green")
-        
-        # Log selected mode and model
+
         logger.info(f"Starting chat in {mode_name} with {model} model")
-        
         last_token_info = None
-        
+
         # Main chat loop
         while True:
-            # Get user input
             user_input = click.prompt("\nYou", prompt_suffix="> ", type=str)
-            
-            # Check for exit commands
             if user_input.lower() in ["exit", "quit", "q"]:
                 break
-                
-            # Check for token info request
             if user_input.lower() == "tokens" and last_token_info:
                 prompt_tokens, completion_tokens = last_token_info
-                total_tokens = prompt_tokens + completion_tokens if completion_tokens else prompt_tokens
-                
+                total_tokens = prompt_tokens + (completion_tokens or 0)
                 click.secho("\nToken usage for last exchange:", fg="blue")
                 click.secho(f"  Prompt tokens: {prompt_tokens}", fg="white")
-                click.secho(f"  Completion tokens: {completion_tokens if completion_tokens else 'unknown'}", fg="white")
-                click.secho(f"  Total tokens: {total_tokens if completion_tokens else 'unknown'}", fg="white")
-                
-                continue  # Skip processing and go to next loop iteration
-                
-            # Process the user input
-            response = chat_instance.process_user_input(user_input)
-            
-            # Store token info for potential display later
-            last_token_info = (response.prompt_tokens or 0, response.token_count)
-            
-            # Display the response
-            click.secho(f"\nCoach: {response.message}", fg="cyan")
-            
-            # For onboarding mode, display options if available
-            if onboarding and response.options:
+                click.secho(f"  Completion tokens: {completion_tokens or 'unknown'}", fg="white")
+                click.secho(f"  Total tokens: {total_tokens}", fg="white")
+                continue
+
+            response = chat_instance.chat(user_input)
+            # Extract token information from the response dictionary
+            prompt_tokens = response.get('tokens', {}).get('prompt', 0)
+            completion_tokens = response.get('tokens', {}).get('completion', 0)
+            last_token_info = (prompt_tokens, completion_tokens)
+
+            # Extract message from the response dictionary
+            click.secho(f"\nCoach: {response.get('message', 'No response')}", fg="cyan")
+
+            # Handle options for onboarding if present
+            if onboarding and 'options' in response and response['options']:
                 click.secho("\nOptions:", fg="yellow")
-                for i, option in enumerate(response.options):
+                for i, option in enumerate(response['options']):
                     click.secho(f"{i+1}. {option}", fg="yellow")
-            
-            # For onboarding mode, display memory update information
-            if onboarding and response.memory_updated:
-                click.secho("\n[Your profile has been updated with this information]", fg="green")
-                
+
+            # Show memory update notification if applicable
+            if onboarding and response.get('memory_updated', False):
+                 click.secho("\n[Your profile has been updated]", fg="green")
+
+            # Show token information in debug mode
             if debug:
-                if response.prompt_tokens:
-                    click.secho(f"Prompt tokens: {response.prompt_tokens}", fg="blue")
-                if response.token_count:
-                    click.secho(f"Response tokens: {response.token_count}", fg="blue")
-        
-        # For onboarding mode, show a summary at the end
+                 if prompt_tokens:
+                      click.secho(f"Prompt tokens: {prompt_tokens}", fg="blue")
+                 if completion_tokens:
+                      click.secho(f"Response tokens: {completion_tokens}", fg="blue")
+
+        # ... (Onboarding summary display remains the same) ...
         if onboarding:
             click.secho("\n=== Your Fitness Profile Summary ===", fg="green", bold=True)
-            
-            # Get specific sections that are most relevant
-            memory_dict = chat_instance.memory.model_dump()
-            
-            # Show workout goals
-            if memory_dict.get("workout_memory", {}).get("workout_goals", {}).get("current_goals"):
-                click.secho("\nYour Fitness Goals:", fg="green")
-                for goal in memory_dict["workout_memory"]["workout_goals"]["current_goals"]:
-                    click.secho(f"- {goal.get('goal', 'Unknown goal')}", fg="white")
-            
-            # Show workout preferences if they exist
-            if memory_dict.get("workout_memory", {}).get("workout_preferences"):
-                click.secho("\nYour Workout Preferences:", fg="green")
-                preferences = memory_dict["workout_memory"]["workout_preferences"]
-                for key, value in preferences.items():
-                    click.secho(f"- {key}: {value}", fg="white")
-            
-            # Show health conditions if they exist
-            if memory_dict.get("medical_history", {}).get("conditions"):
-                click.secho("\nHealth Considerations:", fg="green")
-                for condition in memory_dict["medical_history"]["conditions"]:
-                    click.secho(f"- {condition.get('name', 'Unknown condition')}", fg="white")
-            
-            click.secho("\nOnboarding completed! Your personalized fitness plan is ready.", fg="green", bold=True)
-                            
-        # Save the updated memory
+            # Use get_llm_view for a consistent summary
+            summary_view = chat_instance.memory.user_profile.get_llm_view() if chat_instance.memory.user_profile else "Profile could not be fully loaded."
+            click.secho(summary_view, fg="white")
+            click.secho("\nOnboarding completed! You can continue chatting or type 'exit'.", fg="green", bold=True)
+
         click.secho("\nSaving updated memory...", fg="blue")
-        mm.save_compact_memory(chat_instance.memory)
+        mm.save_memory(chat_instance.memory)
         click.secho("Memory saved successfully.", fg="green")
-        
+
     except Exception as e:
         logger.error(f"Error in chat session: {str(e)}", exc_info=True)
         click.secho(f"Error: {str(e)}", fg="red")
@@ -344,7 +334,7 @@ def list_models(verbose: bool):
     """List available models from OpenRouter and test connection."""
     from backend.llm.openrouter_client import OpenRouterClient, MODELS
     import json
-    
+
     # First check our local model mapping
     click.secho("Local model mappings:", fg="blue")
     for model_key, model_id in MODELS.items():
@@ -354,39 +344,39 @@ def list_models(verbose: bool):
         click.secho("\nError: OPENROUTER_API_KEY is not set in your .env file", fg="red")
         click.secho("Create a .env file with OPENROUTER_API_KEY=your_api_key", fg="yellow")
         return
-        
+
     click.secho("\nConnecting to OpenRouter API to fetch available models...", fg="blue")
-    
+
     try:
         client = OpenRouterClient()
         models = client.list_models()
-        
+
         if "error" in models:
             click.secho(f"Error connecting to OpenRouter: {models['error']}", fg="red")
             return
-            
+
         if not models.get('data'):
             click.secho("No models found or unexpected response format", fg="yellow")
             if verbose:
                 click.secho(f"Raw response: {json.dumps(models, indent=2)}", fg="yellow")
             return
-            
+
         click.secho(f"\nFound {len(models['data'])} available models:", fg="green")
-        
+
         for model in models['data']:
             model_id = model.get('id', 'unknown')
             model_name = model.get('name', 'Unnamed')
-            
+
             in_our_models = False
             for key, value in MODELS.items():
                 if value == model_id:
                     in_our_models = True
                     break
-                    
+
             color = "green" if in_our_models else "white"
             status = " (in app)" if in_our_models else ""
             click.secho(f"  {model_id}: {model_name}{status}", fg=color)
-            
+
             if verbose:
                 context_length = model.get('context_length', 'unknown')
                 pricing = model.get('pricing', {})
@@ -395,7 +385,7 @@ def list_models(verbose: bool):
                     input_price = pricing.get('input', 0)
                     output_price = pricing.get('output', 0)
                     click.secho(f"    Pricing: ${input_price}/M input tokens, ${output_price}/M output tokens", fg="cyan")
-    
+
     except Exception as e:
         click.secho(f"Error: {e}", fg="red")
         import traceback

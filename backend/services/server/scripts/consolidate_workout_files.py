@@ -89,19 +89,6 @@ def consolidate_workout_files(data_dir, user_id=None, remove_workouts_file=False
                 "workout_memory": {
                     "last_updated": now,
                     "recent_workouts": [],
-                    "workout_patterns": {
-                        "frequency": {
-                            "weekly_average": 0,
-                            "most_active_days": [],
-                            "consistency_score": 0
-                        },
-                        "preferred_times": {
-                            "morning": 0,
-                            "afternoon": 0,
-                            "evening": 0
-                        },
-                        "performance_trends": {}
-                    }
                 }
             }
         

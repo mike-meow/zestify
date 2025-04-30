@@ -13,7 +13,6 @@ base + {
     
     // Demographics
     demographics: {
-      birth_date: "",
       age: 0,
       gender: "",
       height: 0,
