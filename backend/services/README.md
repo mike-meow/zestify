@@ -18,7 +18,10 @@ Options:
 
 - `--debug`: Show debug information including token counts
 - `--model`: Choose the LLM model to use (default: deepseek)
-  - Available models: deepseek, claude, gemini, gemini-pro, gemini-thinking
+  - Available models: deepseek, deepseek-v3, deepseek-r1, deepseek-r1-zero, claude, claude-3.7-sonnet, claude-3.5-sonnet, claude-3-opus, gemini, gemini-pro, gemini-flash, gemini-thinking, gpt-4, gpt-4o, gpt-4.1
+  - You can specify multiple models to compare responses side by side:
+    - Using space-separated list: `--model "gpt-4o gpt-4.1 gemini-pro"`
+    - Using multiple flags: `--model claude --model gpt-4o`
 - `--onboarding`: Run in onboarding mode to gather user information
 
 #### Chat Mode
@@ -84,6 +87,78 @@ $ python -m backend.services.cli chat user123
 Coach: How can I help you with your fitness journey today?
 You> What's a good beginner workout?
 Coach: For beginners, I recommend starting with a simple full-body routine...
+```
+
+Multi-model comparison:
+
+```
+$ python -m backend.services.cli chat user123 --model "gpt-4o gpt-4.1"
+AI Health Coach initialized with multiple models: gpt-4o, gpt-4.1
+Responses from all models will be shown side by side.
+
+You> What's the best way to build endurance?
+
+================================================================================
+MODEL RESPONSES:
+================================================================================
+
+[gpt-4o]
+--------------------------------------------------------------------------------
+The best way to build endurance involves a progressive, multi-faceted approach:
+
+1. Start with a baseline assessment to understand your current fitness level.
+
+2. Implement a consistent cardio program that includes:
+   - Low-intensity steady-state (LISS) training (60-70% max heart rate) for building aerobic base
+   - High-intensity interval training (HIIT) for improving VO2 max and lactate threshold
+   - Tempo workouts at moderate intensity (70-80% max heart rate)
+
+3. Follow the principle of progressive overload by gradually increasing:
+   - Duration (time or distance)
+   - Frequency (sessions per week)
+   - Intensity (pace or resistance)
+
+4. Cross-train with different activities like running, cycling, swimming, or rowing to develop well-rounded endurance and prevent overuse injuries.
+
+5. Include strength training 2-3 times weekly, focusing on functional movements and core stability.
+
+6. Pay attention to proper nutrition and hydration to fuel your workouts and recovery.
+
+7. Ensure adequate recovery through proper sleep, rest days, and active recovery.
+
+8. Consider periodization in your training schedule with defined build and recovery phases.
+
+Remember that building endurance is a gradual process that requires consistency over time. Progress should be measured in weeks and months, not days.
+--------------------------------------------------------------------------------
+
+[gpt-4.1]
+--------------------------------------------------------------------------------
+The best way to build endurance involves a progressive, multi-faceted approach:
+
+1. Start with a baseline assessment to understand your current fitness level.
+
+2. Implement a consistent cardio program that includes:
+   - Low-intensity steady-state (LISS) training (60-70% max heart rate) for building aerobic base
+   - High-intensity interval training (HIIT) for improving VO2 max and lactate threshold
+   - Tempo workouts at moderate intensity (70-80% max heart rate)
+
+3. Follow the principle of progressive overload by gradually increasing:
+   - Duration (time or distance)
+   - Frequency (sessions per week)
+   - Intensity (pace or resistance)
+
+4. Cross-train with different activities like running, cycling, swimming, or rowing to develop well-rounded endurance and prevent overuse injuries.
+
+5. Include strength training 2-3 times weekly, focusing on functional movements and core stability.
+
+6. Pay attention to proper nutrition and hydration to fuel your workouts and recovery.
+
+7. Ensure adequate recovery through proper sleep, rest days, and active recovery.
+
+8. Consider periodization in your training schedule with defined build and recovery phases.
+
+Remember that building endurance is a gradual process that requires consistency over time. Progress should be measured in weeks and months, not days.
+--------------------------------------------------------------------------------
 ```
 
 Onboarding:

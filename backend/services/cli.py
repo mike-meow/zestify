@@ -26,9 +26,13 @@ def cli():
 
 @cli.command()
 @click.option('--debug', is_flag=True, help='Show debug information and LLM outputs')
-@click.option('--model', type=click.Choice(['gemini', 'gemini-pro', 'gemini-thinking', 'deepseek', 'claude']),
-              default='deepseek',
-              help='LLM model to use for conversation (default: deepseek)')
+@click.option('--model', type=click.Choice([
+    'gemini', 'gemini-pro', 'gemini-flash', 'gemini-thinking', 
+    'deepseek', 'deepseek-v3', 'deepseek-r1', 'deepseek-r1-zero',
+    'claude', 'claude-3.7-sonnet', 'claude-3.5-sonnet', 'claude-3-opus',
+    'gpt-4', 'gpt-4o', 'gpt-4.1']),
+    default='deepseek',
+    help='LLM model to use for conversation (default: deepseek)')
 def onboard(debug: bool, model: str) -> None:
     """
     [DEPRECATED] Start the onboarding process to create your wellness profile.
@@ -183,18 +187,37 @@ def memory_overview(user_id: str, workout_start_date: str, compact: bool):
 @cli.command()
 @click.argument('user_id')
 @click.option('--debug', is_flag=True, help='Show debug information including token counts')
-@click.option('--model', type=click.Choice(['gemini', 'gemini-pro', 'gemini-thinking', 'deepseek', 'claude']),
-              default='deepseek',
-              help='LLM model to use for chat (default: deepseek)')
+@click.option('--model', default=["deepseek"], multiple=True,
+              help='LLM model(s) to use (can specify multiple models separated by spaces or multiple --model flags)')
 @click.option('--onboarding', is_flag=True, help='Run in onboarding mode to gather user information')
-def chat(user_id: str, debug: bool, model: str, onboarding: bool) -> None:
+def chat(user_id: str, debug: bool, model: tuple, onboarding: bool) -> None:
     """Start an interactive chat session with your AI health coach.
+
+    You can specify multiple models to compare responses side by side.
+    Examples:
+      - Single model: chat user123 --model claude
+      - Multiple models (space-separated): chat user123 --model "gpt-4o gpt-4.1 gemini-pro"
+      - Multiple models (separate flags): chat user123 --model claude --model gpt-4o
 
     Available models:
       - deepseek: DeepSeek Chat v3 (default, good all-purpose model)
+      - deepseek-v3: Full version of DeepSeek Chat v3
+      - deepseek-r1: DeepSeek's advanced reasoning model
+      - deepseek-r1-zero: Free version of DeepSeek R1 (experimental)
+      
       - gemini: Google Gemini 2.0 Flash (fast, efficient)
       - gemini-pro: Google Gemini 2.5 Pro (more capable but costs credits)
+      - gemini-flash: Google Gemini 2.5 Flash (balanced performance)
+      - gemini-thinking: Gemini with thinking tokens (better reasoning)
+      
       - claude: Anthropic Claude 3 Sonnet (excellent for detailed responses)
+      - claude-3.7-sonnet: Latest Claude model with improved reasoning
+      - claude-3.5-sonnet: Balanced Claude model with good performance
+      - claude-3-opus: Most powerful Claude model (highest quality, higher cost)
+        
+      - gpt-4: OpenAI GPT-4 (powerful general-purpose model)
+      - gpt-4o: OpenAI GPT-4o (optimized for speed and efficiency)
+      - gpt-4.1: OpenAI GPT-4.1 (latest version with improved reasoning)
 
     Add the --onboarding flag to switch to onboarding mode, which focuses on gathering
     user information and setting up a fitness profile.
@@ -202,6 +225,31 @@ def chat(user_id: str, debug: bool, model: str, onboarding: bool) -> None:
     if not os.getenv("OPENROUTER_API_KEY"):
         click.secho("Error: OPENROUTER_API_KEY is not set in your .env file", fg="red")
         click.secho("Create a .env file with OPENROUTER_API_KEY=your_api_key", fg="yellow")
+        return
+
+    # Parse model input - handle both space-separated string and multiple --model flags
+    valid_models = [
+        'gemini', 'gemini-pro', 'gemini-flash', 'gemini-thinking', 
+        'deepseek', 'deepseek-v3', 'deepseek-r1', 'deepseek-r1-zero',
+        'claude', 'claude-3.7-sonnet', 'claude-3.5-sonnet', 'claude-3-opus',
+        'gpt-4', 'gpt-4o', 'gpt-4.1'
+    ]
+    
+    # Process the model parameter(s)
+    models = []
+    for m in model:
+        # Split by spaces to handle space-separated list in each --model flag
+        models.extend(m.split())
+    
+    # Default to deepseek if somehow no models were specified
+    if not models:
+        models = ['deepseek']
+    
+    # Validate models
+    invalid_models = [m for m in models if m not in valid_models]
+    if invalid_models:
+        click.secho(f"Error: Invalid model(s): {', '.join(invalid_models)}", fg="red")
+        click.secho(f"Valid models are: {', '.join(valid_models)}", fg="yellow")
         return
 
     if debug:
@@ -216,6 +264,7 @@ def chat(user_id: str, debug: bool, model: str, onboarding: bool) -> None:
     from backend.prompts.chat import Chat, Onboarding, ChatRole
     from backend.memory.manager import OverviewMemoryManager
     import json
+    from concurrent.futures import ThreadPoolExecutor
 
     try:
         # Initialize memory manager (this will create user dir if needed)
@@ -225,26 +274,44 @@ def chat(user_id: str, debug: bool, model: str, onboarding: bool) -> None:
         # Load memory - This will now handle missing files/dirs gracefully
         click.secho("Loading memory...", fg="blue")
         try:
-            # load_memory now returns a potentially partially filled OverallMemory
             memory = mm.load_memory()
-            if memory.user_profile: # Check if profile was successfully loaded/created
-                 click.secho("Memory loaded successfully.", fg="green")
-            else:
-                 click.secho("Memory loaded, but UserProfile is missing (could not determine user_id?).", fg="yellow")
-                 # Decide if we should proceed without a user profile or exit?
-                 # For now, let's allow proceeding, but the chat might be limited.
         except Exception as load_err: # Catch broader errors during loading/validation
             logger.error(f"Critical error loading memory: {load_err}", exc_info=True)
             click.secho(f"Critical error loading memory: {load_err}. Exiting.", fg="red")
             return # Exit if loading fundamentally failed
 
-        # Initialize chat based on mode using the potentially partial OverallMemory
+        # Initialize one chat instance for each model
+        chat_instances = {}
+        model_colors = {
+            'deepseek': 'blue',
+            'deepseek-v3': 'blue',
+            'deepseek-r1': 'cyan',
+            'deepseek-r1-zero': 'cyan',
+            'claude': 'magenta',
+            'claude-3.7-sonnet': 'magenta',
+            'claude-3.5-sonnet': 'bright_magenta',
+            'claude-3-opus': 'bright_magenta',
+            'gemini': 'green',
+            'gemini-pro': 'bright_green',
+            'gemini-flash': 'green',
+            'gemini-thinking': 'bright_green',
+            'gpt-4': 'yellow',
+            'gpt-4o': 'bright_yellow',
+            'gpt-4.1': 'yellow'
+        }
+        
         if onboarding:
             # Check if user profile exists, essential for onboarding
             if not memory.user_profile:
                  click.secho("Cannot start onboarding without a user profile. Please ensure user_id is available.", fg="red")
                  return
-            chat_instance = Onboarding(memory=memory, model=model)
+                 
+            # For onboarding, only support a single model
+            if len(models) > 1:
+                click.secho("Onboarding mode only supports a single model. Using the first specified model.", fg="yellow")
+                models = (models[0],)
+                
+            chat_instances[models[0]] = Onboarding(memory_manager=mm, model=models[0])
             mode_name = "Onboarding Mode"
             # ... (onboarding intro)
             click.secho("\n=== Health & Fitness Onboarding ===", fg="green", bold=True)
@@ -256,7 +323,7 @@ def chat(user_id: str, debug: bool, model: str, onboarding: bool) -> None:
             if memory.user_profile.name:
                  initial_prompt = f"Start onboarding for {memory.user_profile.name}"
 
-            initial_response = chat_instance.chat(initial_prompt)
+            initial_response = chat_instances[models[0]].chat(initial_prompt)
             click.secho(f"Coach: {initial_response.get('message', 'No response')}", fg="cyan")
             if 'options' in initial_response and initial_response['options']:
                  click.secho("\nOptions:", fg="yellow")
@@ -264,65 +331,130 @@ def chat(user_id: str, debug: bool, model: str, onboarding: bool) -> None:
                       click.secho(f"{i+1}. {option}", fg="yellow")
 
         else: # Regular chat mode
-            chat_instance = Chat(memory=memory, model=model, debug=debug)
+            for m in models:
+                chat_instances[m] = Chat(memory_manager=mm, model=m, debug=debug)
             mode_name = "Chat Mode"
-            click.secho(f"AI Health Coach initialized using {model} model. Type 'exit' or 'quit' to end the session.", fg="green")
+            
+            if len(models) == 1:
+                click.secho(f"AI Health Coach initialized using {models[0]} model. Type 'exit' or 'quit' to end the session.", fg="green")
+            else:
+                model_list = ", ".join(models)
+                click.secho(f"AI Health Coach initialized with multiple models: {model_list}", fg="green")
+                click.secho(f"Responses from all models will be shown side by side.", fg="green")
+            
             click.secho("Type 'tokens' to see token counts for the last exchange.", fg="green")
 
-        logger.info(f"Starting chat in {mode_name} with {model} model")
-        last_token_info = None
+        logger.info(f"Starting chat in {mode_name} with models: {', '.join(models)}")
+        last_token_info = {}
 
         # Main chat loop
         while True:
             user_input = click.prompt("\nYou", prompt_suffix="> ", type=str)
             if user_input.lower() in ["exit", "quit", "q"]:
                 break
+                
             if user_input.lower() == "tokens" and last_token_info:
-                prompt_tokens, completion_tokens = last_token_info
-                total_tokens = prompt_tokens + (completion_tokens or 0)
                 click.secho("\nToken usage for last exchange:", fg="blue")
-                click.secho(f"  Prompt tokens: {prompt_tokens}", fg="white")
-                click.secho(f"  Completion tokens: {completion_tokens or 'unknown'}", fg="white")
-                click.secho(f"  Total tokens: {total_tokens}", fg="white")
+                for m, (prompt_tokens, completion_tokens) in last_token_info.items():
+                    total_tokens = prompt_tokens + (completion_tokens or 0)
+                    click.secho(f"  {m}:", fg=model_colors.get(m, 'white'))
+                    click.secho(f"    Prompt tokens: {prompt_tokens}", fg="white")
+                    click.secho(f"    Completion tokens: {completion_tokens or 'unknown'}", fg="white")
+                    click.secho(f"    Total tokens: {total_tokens}", fg="white")
                 continue
 
-            response = chat_instance.chat(user_input)
-            # Extract token information from the response dictionary
-            prompt_tokens = response.get('tokens', {}).get('prompt', 0)
-            completion_tokens = response.get('tokens', {}).get('completion', 0)
-            last_token_info = (prompt_tokens, completion_tokens)
+            # Get responses from all models in parallel
+            responses = {}
+            
+            def get_response(model_name):
+                try:
+                    return model_name, chat_instances[model_name].chat(user_input)
+                except Exception as e:
+                    logger.error(f"Error from {model_name}: {str(e)}")
+                    return model_name, {"message": f"Error: {str(e)}", "error": True}
+            
+            with ThreadPoolExecutor(max_workers=len(chat_instances)) as executor:
+                future_responses = [executor.submit(get_response, m) for m in chat_instances]
+                for future in future_responses:
+                    model_name, response = future.result()
+                    responses[model_name] = response
+                    
+                    # Store token counts for later display
+                    if hasattr(response, 'token_counts'):
+                        last_token_info[model_name] = response.token_counts
+                    elif isinstance(response, dict) and 'token_counts' in response:
+                        last_token_info[model_name] = response['token_counts']
+            
+            # Display responses
+            if len(responses) == 1:
+                # Single model mode - simple display
+                model_name = list(responses.keys())[0]
+                response = responses[model_name]
+                
+                # Extract message
+                if hasattr(response, 'message'):
+                    message = response.message
+                else:
+                    message = response.get('message', 'No response available')
+                
+                # Display the message
+                click.secho(f"\nCoach ({model_name}): ", fg=model_colors.get(model_name, 'cyan'), nl=False)
+                click.secho(f"{message}", fg="white")
+                
+                # Handle options for onboarding if present
+                if onboarding:
+                    # Check if response has options attribute or key
+                    options = None
+                    if hasattr(response, 'options'):
+                        options = response.options
+                    elif isinstance(response, dict) and 'options' in response:
+                        options = response['options']
 
-            # Extract message from the response dictionary
-            click.secho(f"\nCoach: {response.get('message', 'No response')}", fg="cyan")
+                    if options:
+                        click.secho("\nOptions:", fg="yellow")
+                        for i, option in enumerate(options):
+                            click.secho(f"{i+1}. {option}", fg="yellow")
 
-            # Handle options for onboarding if present
-            if onboarding and 'options' in response and response['options']:
-                click.secho("\nOptions:", fg="yellow")
-                for i, option in enumerate(response['options']):
-                    click.secho(f"{i+1}. {option}", fg="yellow")
+                # Show memory update notification if applicable
+                memory_updated = False
+                if hasattr(response, 'memory_updated'):
+                    memory_updated = response.memory_updated
+                elif isinstance(response, dict):
+                    memory_updated = response.get('memory_updated', False)
 
-            # Show memory update notification if applicable
-            if onboarding and response.get('memory_updated', False):
-                 click.secho("\n[Your profile has been updated]", fg="green")
-
-            # Show token information in debug mode
-            if debug:
-                 if prompt_tokens:
-                      click.secho(f"Prompt tokens: {prompt_tokens}", fg="blue")
-                 if completion_tokens:
-                      click.secho(f"Response tokens: {completion_tokens}", fg="blue")
-
-        # ... (Onboarding summary display remains the same) ...
+                if onboarding and memory_updated:
+                    click.secho("\n[Your profile has been updated]", fg="green")
+            
+            else:
+                # Multi-model mode - display responses side by side with dividers
+                click.secho("\n" + "="*80, fg="white")
+                click.secho("MODEL RESPONSES:", fg="bright_white", bold=True)
+                click.secho("="*80, fg="white")
+                
+                for model_name, response in responses.items():
+                    # Extract message
+                    if hasattr(response, 'message'):
+                        message = response.message
+                    else:
+                        message = response.get('message', 'No response available')
+                    
+                    # Display the model name and response
+                    click.secho(f"\n[{model_name}]", fg=model_colors.get(model_name, 'cyan'), bold=True)
+                    click.secho("-"*80, fg="white")
+                    click.secho(f"{message}", fg="white")
+                    click.secho("-"*80, fg="white")
+            
+        # Onboarding summary display if applicable
         if onboarding:
             click.secho("\n=== Your Fitness Profile Summary ===", fg="green", bold=True)
+            # Load the latest memory to get the updated profile
+            updated_memory = mm.load_memory()
             # Use get_llm_view for a consistent summary
-            summary_view = chat_instance.memory.user_profile.get_llm_view() if chat_instance.memory.user_profile else "Profile could not be fully loaded."
+            summary_view = updated_memory.user_profile.get_llm_view() if updated_memory.user_profile else "Profile could not be fully loaded."
             click.secho(summary_view, fg="white")
             click.secho("\nOnboarding completed! You can continue chatting or type 'exit'.", fg="green", bold=True)
 
-        click.secho("\nSaving updated memory...", fg="blue")
-        mm.save_memory(chat_instance.memory)
-        click.secho("Memory saved successfully.", fg="green")
+        click.secho("\nMemory has been saved automatically.", fg="green")
 
     except Exception as e:
         logger.error(f"Error in chat session: {str(e)}", exc_info=True)

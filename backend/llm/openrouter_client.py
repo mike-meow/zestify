@@ -26,13 +26,35 @@ logger = logging.getLogger(__name__)
 
 # Model configuration
 MODELS = {
-    # Using Gemini 2.0 Flash Experimental as the default
+    # Google Gemini models
     "gemini": "google/gemini-2.0-flash-exp:free",
     "gemini-pro": "google/gemini-2.5-pro-preview-03-25",  # Paid tier
     "gemini-flash": "google/gemini-2.5-flash-preview",    # Alternative option
     "gemini-thinking": "google/gemini-2.5-flash-preview:thinking",  # With thinking tokens
+    
+    # Anthropic Claude models
+    "claude": "anthropic/claude-3-sonnet-20240229",
+    "claude-3.7-sonnet": "anthropic/claude-3.7-sonnet",
+    "claude-3.5-sonnet": "anthropic/claude-3.5-sonnet",
+    "claude-3.5-haiku": "anthropic/claude-3.5-haiku",
+    "claude-3-opus": "anthropic/claude-3-opus",
+    "claude-3-haiku": "anthropic/claude-3-haiku",
+    "claude-2.1": "anthropic/claude-2.1",
+    
+    # DeepSeek models
     "deepseek": "deepseek/deepseek-chat-v3-0324:free",
-    "claude": "anthropic/claude-3-sonnet-20240229"
+    "deepseek-v3": "deepseek/deepseek-chat-v3-0324",
+    "deepseek-r1": "deepseek/deepseek-r1",
+    "deepseek-r1-zero": "deepseek/deepseek-r1-zero:free",
+    "deepseek-r1-qwen-1.5b": "deepseek/deepseek-r1-distill-qwen-1.5b",
+    "deepseek-r1-qwen-14b": "deepseek/deepseek-r1-distill-qwen-14b",
+    "deepseek-r1-qwen-32b": "deepseek/deepseek-r1-distill-qwen-32b",
+    
+    # OpenAI models
+    "gpt-4": "openai/gpt-4",
+    "gpt-4-turbo": "openai/gpt-4-turbo",
+    "gpt-4.1": "openai/gpt-4.1",
+    "gpt-4o": "openai/gpt-4o"
 }
 
 DEFAULT_MODEL = MODELS["deepseek"]

@@ -32,41 +32,33 @@ class MemoryManager:
                  # Depending on requirements, could re-raise or proceed cautiously
                  # For now, let's proceed, loading will likely yield an empty memory.
                  pass
-    
-    # Add support for Pydantic serialization and validation
+
+    # Add support for Pydantic v2 serialization and validation
     @classmethod
-    def __get_validators__(cls):
+    def __get_pydantic_core_schema__(cls, _source_type, _handler):
         """
-        Yield validators for handling MemoryManager in Pydantic models. 
-        This is the older Pydantic v1 style which is more compatible.
+        Get the Pydantic core schema for MemoryManager.
+        This is the Pydantic v2 style for validation.
         """
-        yield cls.validate
-    
-    @classmethod
-    def validate(cls, value):
-        """
-        Validate and convert a value to MemoryManager.
-        
-        Args:
-            value: The value to validate (string, dict, or MemoryManager)
-            
-        Returns:
-            MemoryManager instance
-        """
-        if value is None:
-            return None
-        if isinstance(value, cls):
-            return value
-        if isinstance(value, str):
-            return cls(value)
-        if isinstance(value, dict) and "user_id" in value:
-            return cls(value["user_id"])
-        raise ValueError(f"Cannot convert {value} to {cls.__name__}")
+        from pydantic_core import core_schema
+
+        def validate_from_python(value, _info):
+            if value is None:
+                return None
+            if isinstance(value, cls):
+                return value
+            if isinstance(value, str):
+                return cls(value)
+            if isinstance(value, dict) and "user_id" in value:
+                return cls(value["user_id"])
+            raise ValueError(f"Cannot convert {value} to {cls.__name__}")
+
+        return core_schema.with_info_plain_validator_function(validate_from_python)
 
     def load_memory(self) -> OverallMemory:
         """Load all memory files for the user and merge into a single OverallMemory object."""
         # Pass user_id to from_user_dir to help initialize UserProfile if needed
-        return OverallMemory.from_user_dir(self.user_dir, self.user_id) 
+        return OverallMemory.from_user_dir(self.user_dir, self.user_id)
 
     def get_compact_memory(self) -> CompactOverallMemory:
         """
@@ -94,22 +86,22 @@ class MemoryManager:
             path = self.user_dir / f"{key}.json"
             with open(path, "w") as f:
                 json.dump(value, f, indent=2, default=json_serial)
-    
-    def apply_json_patch(self, memory: OverallMemory, patch: List[Dict[str, Any]]) -> Optional[OverallMemory]:
+
+    def apply_json_patch(self, memory: OverallMemory, patch: List[Dict[str, Any]]) -> bool:
         """
         Apply a JSON patch to the OverallMemory object.
-        
+
         Args:
             memory: The OverallMemory object to update
             patch: List of JSON Patch operations
-            
+
         Returns:
-            Updated OverallMemory if patch was successfully applied, None otherwise
+            True if patch was successfully applied, False otherwise
         """
         if not patch:
             logger.info("No memory patch to apply")
-            return None
-            
+            return False
+
         try:
             # Log patch operations
             logger.info(f"Applying memory patch with {len(patch)} operations:")
@@ -120,43 +112,48 @@ class MemoryManager:
                 if len(str(op.get('value', ''))) > 50:
                     value_preview += "..."
                 logger.info(f"  Operation {i+1}: {op_type} {path} = {value_preview}")
-            
+
             # Apply patch to memory dictionary representation
-            memory_dict = memory.model_dump()
+            # Check if memory is a Pydantic model or a dict
+            if hasattr(memory, 'model_dump'):
+                memory_dict = memory.model_dump()
+            else:
+                # If it's already a dict, use it directly
+                memory_dict = memory
             patch_obj = jsonpatch.JsonPatch(patch)
             patched_memory_dict = patch_obj.apply(memory_dict)
-            
+
             # Track which components were modified to save them individually later
             modified_components = self._identify_modified_components(patch)
-            
+
             # Validate and update memory using OverallMemory
             updated_memory = OverallMemory.model_validate(patched_memory_dict)
-            
+
             # Save individual components that were modified
             self._save_updated_components(updated_memory, modified_components)
-            
+
             logger.info("Memory patch successfully applied")
-            return updated_memory
-            
+            return True
+
         except jsonpatch.JsonPatchConflict as e:
             logger.error(f"JsonPatch conflict applying patch: {e}. Patch: {json.dumps(patch)}", exc_info=True)
             return None
         except Exception as e:
             logger.error(f"Error applying memory patch: {str(e)}. Patch: {json.dumps(patch)}", exc_info=True)
             return None
-    
+
     def _identify_modified_components(self, patch: List[Dict[str, Any]]) -> List[str]:
         """
         Identify which components were modified in a memory patch.
-        
+
         Args:
             patch: List of JSON Patch operations
-            
+
         Returns:
             List of component names that were modified
         """
         modified_components = set()
-        
+
         for op in patch:
             path = op.get('path', '')
             # Extract the top-level component name from the path
@@ -176,13 +173,13 @@ class MemoryManager:
                     modified_components.add('workout_plan')
                 elif component == 'chat_history':
                     modified_components.add('chat_history')
-        
+
         return list(modified_components)
-    
+
     def _save_updated_components(self, memory: OverallMemory, component_names: List[str]) -> None:
         """
         Save individual memory components that were modified.
-        
+
         Args:
             memory: The updated OverallMemory object
             component_names: List of component names to save
@@ -190,7 +187,7 @@ class MemoryManager:
         if not hasattr(memory, 'user_info') or not memory.user_info or not memory.user_info.user_id:
             logger.warning("Cannot save components: user_id not found in memory")
             return
-        
+
         for component in component_names:
             try:
                 # Get the component data from memory
@@ -223,12 +220,12 @@ class MemoryManager:
                     component_data['last_interaction'] = datetime.now()
                 else:
                     continue  # Skip if component doesn't exist
-                
+
                 # Save component data to file
                 with open(file_path, "w") as f:
                     json.dump(component_data, f, indent=2, default=json_serial)
                 logger.info(f"Saved updated {component} to {file_path}")
-            
+
             except Exception as e:
                 logger.error(f"Error saving {component}: {str(e)}", exc_info=True)
 
@@ -247,31 +244,31 @@ class MemoryManager:
     def get_memory_view(self) -> str:
         """
         Load memory and get the LLM view for prompting.
-        
+
         Returns:
             Formatted string representation of memory for LLM consumption
         """
         memory = self.load_memory()
         return memory.get_llm_view()
-        
+
     def add_message(self, message: Any) -> None:
         """
         Add a message to the chat history.
-        
+
         Args:
             message: Message object to add to history
         """
         memory = self.load_memory()
-        
+
         # Ensure chat_history exists
         if memory.chat_history is None:
             from backend.memory.schemas import ChatHistory
             memory.chat_history = ChatHistory(user_id=self.user_id)
-            
+
         # Ensure conversations list exists
         if memory.chat_history.conversations is None:
             memory.chat_history.conversations = []
-            
+
         # Add the message as a dictionary
         memory.chat_history.conversations.append({
             "sender": message.sender,
@@ -279,13 +276,13 @@ class MemoryManager:
             "timestamp": message.timestamp,
             "message_type": message.message_type
         })
-        
+
         # Update last interaction time
         memory.chat_history.last_interaction = datetime.now()
-        
+
         # Save the updated chat history
         self._save_updated_components(memory, ["chat_history"])
-        
+
     def save(self) -> None:
         """Save all memory components to disk."""
         memory = self.load_memory()
@@ -295,21 +292,21 @@ class OverviewMemoryManager(MemoryManager):
     def __init__(self, user_id: str, data_dir: str = "data"):
         super().__init__(user_id, data_dir)
         # No default date filtering here anymore
-        # self.workout_start_date = ... 
+        # self.workout_start_date = ...
 
     def load_memory(self) -> OverallMemory:
         # Load memory using the base class method
         memory = super().load_memory()
-        
-        # --- REMOVED Filtering Logic --- 
+
+        # --- REMOVED Filtering Logic ---
         # The filtering/display logic is now handled within each component's get_llm_view
-        
+
         # REMOVED: memory.activities = Activities(activities=[])
-        
+
         # REMOVED: Chat history filtering based on date range
         # if memory.chat_history and memory.chat_history.conversations:
         #    ... filtering logic ...
-        
+
         # Return the unfiltered memory object
         return memory
 

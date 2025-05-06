@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:health_ai/services/api_service_v2.dart';
+import 'package:health_ai/services/api_service.dart';
 
 /// Screen for configuring server settings
 class ServerSettingsScreenV2 extends StatefulWidget {
@@ -10,7 +10,7 @@ class ServerSettingsScreenV2 extends StatefulWidget {
 }
 
 class _ServerSettingsScreenV2State extends State<ServerSettingsScreenV2> {
-  final _apiService = ApiServiceV2();
+  final _apiService = ApiService();
   final _serverUrlController = TextEditingController(
     text: 'http://192.168.0.114:8005',
   );

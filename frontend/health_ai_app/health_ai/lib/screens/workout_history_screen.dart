@@ -17,7 +17,7 @@ class WorkoutHistoryScreen extends StatefulWidget {
 class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen>
     with SingleTickerProviderStateMixin {
   late Future<WorkoutHistory> _workoutHistoryFuture;
-  WorkoutType? _selectedType;
+  String? _selectedType;
   late TabController _tabController;
 
   @override
@@ -213,7 +213,17 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen>
             return Padding(
               padding: const EdgeInsets.only(right: 8),
               child: FilterChip(
-                label: Text(type.displayName),
+                label: Text(
+                  Workout(
+                    id: '',
+                    workoutType: type,
+                    startTime: DateTime.now(),
+                    endTime: DateTime.now(),
+                    durationInSeconds: 0,
+                    energyBurned: 0,
+                    source: '',
+                  ).displayName,
+                ),
                 selected: _selectedType == type,
                 onSelected: (selected) {
                   setState(() {
@@ -240,26 +250,24 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen>
   Widget _buildWorkoutCard(Workout workout) {
     // Determine gradient based on workout type
     LinearGradient gradient;
-    switch (workout.type) {
-      case WorkoutType.running:
-      case WorkoutType.walking:
-      case WorkoutType.hiking:
-        gradient = AppTheme.primaryGradient;
-        break;
-      case WorkoutType.cycling:
-      case WorkoutType.swimming:
-      case WorkoutType.rowing:
-      case WorkoutType.elliptical:
-      case WorkoutType.stairClimbing:
-        gradient = AppTheme.secondaryGradient;
-        break;
-      case WorkoutType.yoga:
-      case WorkoutType.pilates:
-      case WorkoutType.flexibility:
-        gradient = AppTheme.accentGradient;
-        break;
-      default:
-        gradient = AppTheme.purpleGradient;
+    final typeLower = workout.workoutType.toLowerCase();
+
+    if (typeLower.contains('run') ||
+        typeLower.contains('walk') ||
+        typeLower.contains('hik')) {
+      gradient = AppTheme.primaryGradient;
+    } else if (typeLower.contains('cycl') ||
+        typeLower.contains('swim') ||
+        typeLower.contains('row') ||
+        typeLower.contains('elliptical') ||
+        typeLower.contains('stair')) {
+      gradient = AppTheme.secondaryGradient;
+    } else if (typeLower.contains('yoga') ||
+        typeLower.contains('pilates') ||
+        typeLower.contains('flex')) {
+      gradient = AppTheme.accentGradient;
+    } else {
+      gradient = AppTheme.purpleGradient;
     }
 
     // Format date
@@ -269,7 +277,7 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen>
         '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
 
     return BubbleCard(
-      title: workout.type.displayName,
+      title: workout.displayName,
       subtitle:
           '$formattedDate at $formattedTime • ${workout.formattedDuration}',
       icon: Icons.fitness_center,
@@ -321,7 +329,17 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen>
         final totalHours = (workoutHistory.totalDuration / 3600)
             .toStringAsFixed(1);
         final mostCommonType =
-            workoutHistory.mostCommonWorkoutType?.displayName ?? 'None';
+            workoutHistory.mostCommonWorkoutType != null
+                ? Workout(
+                  id: '',
+                  workoutType: workoutHistory.mostCommonWorkoutType!,
+                  startTime: DateTime.now(),
+                  endTime: DateTime.now(),
+                  durationInSeconds: 0,
+                  energyBurned: 0,
+                  source: '',
+                ).displayName
+                : 'None';
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16),

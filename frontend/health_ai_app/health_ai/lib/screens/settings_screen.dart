@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:health_ai/services/api_service_v2.dart';
+import 'package:health_ai/services/api_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -9,7 +9,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final ApiServiceV2 _apiService = ApiServiceV2();
+  final ApiService _apiService = ApiService();
   final TextEditingController _serverUrlController = TextEditingController();
   final TextEditingController _userIdController = TextEditingController();
   bool _isLoading = true;

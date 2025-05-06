@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:health_ai/services/api_service_v2.dart';
-import 'package:health_ai/services/health_service_v2.dart';
+import 'package:health_ai/services/api_service.dart';
+import 'package:health_ai/services/health_service.dart';
 import 'package:health_ai/theme/app_theme.dart';
 
 /// A simplified screen for health data synchronization
@@ -8,36 +8,38 @@ class SimplifiedHealthSyncScreen extends StatefulWidget {
   const SimplifiedHealthSyncScreen({super.key});
 
   @override
-  State<SimplifiedHealthSyncScreen> createState() => _SimplifiedHealthSyncScreenState();
+  State<SimplifiedHealthSyncScreen> createState() =>
+      _SimplifiedHealthSyncScreenState();
 }
 
-class _SimplifiedHealthSyncScreenState extends State<SimplifiedHealthSyncScreen> {
-  final _healthService = HealthServiceV2();
-  final _apiService = ApiServiceV2();
+class _SimplifiedHealthSyncScreenState
+    extends State<SimplifiedHealthSyncScreen> {
+  final _healthService = HealthService();
+  final _apiService = ApiService();
 
   bool _isLoading = false;
   String _statusMessage = '';
-  
+
   // Date range selection with default values
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 7));
   DateTime _endDate = DateTime.now();
-  
+
   @override
   void initState() {
     super.initState();
     _initializeServices();
   }
-  
+
   Future<void> _initializeServices() async {
     setState(() {
       _isLoading = true;
       _statusMessage = 'Initializing...';
     });
-    
+
     try {
       await _apiService.initialize();
       await _healthService.initialize();
-      
+
       setState(() {
         _isLoading = false;
         _statusMessage = 'Ready to sync health data';
@@ -82,9 +84,10 @@ class _SimplifiedHealthSyncScreenState extends State<SimplifiedHealthSyncScreen>
 
       setState(() {
         _isLoading = false;
-        _statusMessage = success
-            ? 'Health data synced successfully!'
-            : 'Failed to sync health data';
+        _statusMessage =
+            success
+                ? 'Health data synced successfully!'
+                : 'Failed to sync health data';
       });
     } catch (e) {
       setState(() {
@@ -124,7 +127,9 @@ class _SimplifiedHealthSyncScreenState extends State<SimplifiedHealthSyncScreen>
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+            Navigator.of(
+              context,
+            ).pushNamedAndRemoveUntil('/', (route) => false);
           },
         ),
       ),
@@ -148,7 +153,9 @@ class _SimplifiedHealthSyncScreenState extends State<SimplifiedHealthSyncScreen>
                       ),
                       const SizedBox(height: 16),
                       TextField(
-                        controller: TextEditingController(text: _apiService.baseUrl ?? ''),
+                        controller: TextEditingController(
+                          text: _apiService.baseUrl ?? '',
+                        ),
                         decoration: const InputDecoration(
                           labelText: 'Server URL',
                           border: OutlineInputBorder(),
@@ -160,7 +167,9 @@ class _SimplifiedHealthSyncScreenState extends State<SimplifiedHealthSyncScreen>
                       ),
                       const SizedBox(height: 16),
                       TextField(
-                        controller: TextEditingController(text: _apiService.userId ?? ''),
+                        controller: TextEditingController(
+                          text: _apiService.userId ?? '',
+                        ),
                         decoration: const InputDecoration(
                           labelText: 'User ID',
                           border: OutlineInputBorder(),
@@ -174,9 +183,9 @@ class _SimplifiedHealthSyncScreenState extends State<SimplifiedHealthSyncScreen>
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               // Date range selection
               Card(
                 elevation: 2,
@@ -227,29 +236,30 @@ class _SimplifiedHealthSyncScreenState extends State<SimplifiedHealthSyncScreen>
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               // Status and sync button
-              if (_isLoading) 
-                const LinearProgressIndicator(),
-              
+              if (_isLoading) const LinearProgressIndicator(),
+
               const SizedBox(height: 16),
-              
+
               Text(
                 _statusMessage,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: _statusMessage.contains('Error') || _statusMessage.contains('Failed')
-                      ? Colors.red
-                      : _statusMessage.contains('success')
+                  color:
+                      _statusMessage.contains('Error') ||
+                              _statusMessage.contains('Failed')
+                          ? Colors.red
+                          : _statusMessage.contains('success')
                           ? Colors.green
                           : Colors.black,
                 ),
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               // Sync button
               SizedBox(
                 width: double.infinity,
@@ -266,9 +276,9 @@ class _SimplifiedHealthSyncScreenState extends State<SimplifiedHealthSyncScreen>
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               // Back to home button
               SizedBox(
                 width: double.infinity,
@@ -279,7 +289,9 @@ class _SimplifiedHealthSyncScreenState extends State<SimplifiedHealthSyncScreen>
                     style: TextStyle(fontSize: 18),
                   ),
                   onPressed: () {
-                    Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+                    Navigator.of(
+                      context,
+                    ).pushNamedAndRemoveUntil('/', (route) => false);
                   },
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),

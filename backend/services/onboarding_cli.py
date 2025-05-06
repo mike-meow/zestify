@@ -560,7 +560,12 @@ def cli():
 
 @cli.command()
 @click.option('--debug', is_flag=True, help='Show debug information and LLM outputs')
-@click.option('--model', type=click.Choice(['deepseek', 'gemini']), default='gemini',
+@click.option('--model', type=click.Choice([
+    'deepseek', 'deepseek-v3', 'deepseek-r1', 
+    'gemini', 'gemini-pro', 'gemini-flash',
+    'claude', 'claude-3.7-sonnet', 'claude-3.5-sonnet',
+    'gpt-4', 'gpt-4o', 'gpt-4.1'
+]), default='gemini',
               help='LLM model to use for conversation (default: gemini)')
 def onboard(debug: bool, model: str) -> None:
     """Start the onboarding process to create your wellness profile."""

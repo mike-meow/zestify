@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:health_ai/services/api_service_v2.dart';
-import 'package:health_ai/services/health_service_v2.dart';
+import 'package:health_ai/services/api_service.dart';
+import 'package:health_ai/services/health_service.dart';
 import 'package:health_ai/screens/debug/server_settings_screen_v2.dart';
 
 /// Screen for downloading and uploading health data
@@ -14,8 +14,8 @@ class HealthDataDownloadScreenV2 extends StatefulWidget {
 
 class _HealthDataDownloadScreenV2State
     extends State<HealthDataDownloadScreenV2> {
-  final _healthService = HealthServiceV2();
-  final _apiService = ApiServiceV2();
+  final _healthService = HealthService();
+  final _apiService = ApiService();
 
   bool _isLoading = false;
   bool _isUploading = false;

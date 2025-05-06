@@ -142,26 +142,24 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
   Widget _buildAppBar(Workout workout) {
     // Determine color based on workout type
     Color color;
-    switch (workout.type) {
-      case WorkoutType.running:
-      case WorkoutType.walking:
-      case WorkoutType.hiking:
-        color = AppTheme.primaryColor;
-        break;
-      case WorkoutType.cycling:
-      case WorkoutType.swimming:
-      case WorkoutType.rowing:
-      case WorkoutType.elliptical:
-      case WorkoutType.stairClimbing:
-        color = AppTheme.secondaryColor;
-        break;
-      case WorkoutType.yoga:
-      case WorkoutType.pilates:
-      case WorkoutType.flexibility:
-        color = AppTheme.accentColor;
-        break;
-      default:
-        color = const Color(0xFF7B1FA2); // Purple
+    final typeLower = workout.workoutType.toLowerCase();
+
+    if (typeLower.contains('run') ||
+        typeLower.contains('walk') ||
+        typeLower.contains('hik')) {
+      color = AppTheme.primaryColor;
+    } else if (typeLower.contains('cycl') ||
+        typeLower.contains('swim') ||
+        typeLower.contains('row') ||
+        typeLower.contains('elliptical') ||
+        typeLower.contains('stair')) {
+      color = AppTheme.secondaryColor;
+    } else if (typeLower.contains('yoga') ||
+        typeLower.contains('pilates') ||
+        typeLower.contains('flex')) {
+      color = AppTheme.accentColor;
+    } else {
+      color = const Color(0xFF7B1FA2); // Purple
     }
 
     // Format date
@@ -178,7 +176,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
       ),
       flexibleSpace: FlexibleSpaceBar(
         title: Text(
-          workout.type.displayName,
+          workout.displayName,
           style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
@@ -479,12 +477,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     }
 
     // Check if this is an outdoor workout type
-    final isOutdoorWorkout = [
-      WorkoutType.running,
-      WorkoutType.walking,
-      WorkoutType.hiking,
-      WorkoutType.cycling,
-    ].contains(workout.type);
+    final isOutdoorWorkout = workout.isOutdoorWorkout;
 
     if (!isOutdoorWorkout) {
       return const SizedBox.shrink();
