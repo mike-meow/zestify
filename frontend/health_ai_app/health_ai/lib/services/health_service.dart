@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:health/health.dart';
 import 'package:health_ai/services/api_service.dart';
 import 'package:health_ai/services/biometrics_fetcher.dart';
+import 'package:health_ai/services/native_health_service.dart';
 import 'package:health_ai/models/workout/workout.dart';
 import 'package:health_ai/models/workout/workout_history.dart';
 import 'package:health_ai/models/workout/heart_rate_sample.dart';
@@ -27,6 +28,9 @@ class HealthService {
 
   /// API service
   final ApiService _apiService = ApiService();
+
+  /// Native health service for direct HealthKit access
+  final NativeHealthService _nativeHealthService = NativeHealthService();
 
   /// Whether the service is initialized
   bool _isInitialized = false;
@@ -73,6 +77,9 @@ class HealthService {
       // Request authorization
       _hasPermissions = await _health.requestAuthorization(types);
       _isInitialized = true;
+
+      // Also initialize the native health service
+      await _nativeHealthService.initialize();
 
       debugPrint(
         'Health service initialized with permissions: $_hasPermissions',
@@ -275,10 +282,17 @@ class HealthService {
           continue;
         }
 
-        // Create workout data map, sending the raw type string in both fields
+        // Map RUNNING_SAND to RUNNING
+        String normalizedWorkoutType = rawWorkoutType;
+        if (rawWorkoutType.toUpperCase() == 'RUNNING_SAND') {
+          normalizedWorkoutType = 'RUNNING';
+          debugPrint('Mapped RUNNING_SAND to RUNNING');
+        }
+
+        // Create workout data map with normalized workout type
         final workoutData = {
           'id': dataPoint.dateFrom.millisecondsSinceEpoch.toString(),
-          'workout_type': rawWorkoutType,
+          'workout_type': normalizedWorkoutType,
           'original_type': rawWorkoutType,
           'start_date': dataPoint.dateFrom.toIso8601String(),
           'end_date': dataPoint.dateTo.toIso8601String(),
@@ -315,6 +329,10 @@ class HealthService {
         } catch (e) {
           debugPrint('Error fetching heart rate for workout: $e');
         }
+
+        // We're not calculating kilometer splits anymore
+        // In the future, we'll use the native implementation to get this data
+        // For now, we'll leave segment_data empty
 
         processedWorkouts.add(workoutData);
       }
@@ -369,6 +387,9 @@ class HealthService {
       return {};
     }
   }
+
+  // We've removed the _fetchWorkoutSegmentData method since we're not using it anymore
+  // In the future, we'll use the native implementation to get kilometer splits
 
   /// Fetch biometrics data
   Future<Map<String, dynamic>> _fetchBiometrics(
@@ -807,7 +828,32 @@ class HealthService {
   }
 
   /// Fetch workout history from Apple Health
+  /// This method now tries to use the native implementation first for more accurate data
   Future<WorkoutHistory> fetchWorkoutHistory({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    // Try to use the native implementation first
+    try {
+      // Use the native implementation which has more accurate kilometer splits
+      return await fetchWorkoutHistoryWithNativeSplits(
+        startDate: startDate,
+        endDate: endDate,
+      );
+    } catch (e) {
+      debugPrint(
+        'Native implementation failed, falling back to Flutter health package: $e',
+      );
+      // Fall back to the Flutter health package implementation
+      return await _fetchWorkoutHistoryWithFlutterHealthPackage(
+        startDate: startDate,
+        endDate: endDate,
+      );
+    }
+  }
+
+  /// Fetch workout history using the Flutter health package (fallback method)
+  Future<WorkoutHistory> _fetchWorkoutHistoryWithFlutterHealthPackage({
     DateTime? startDate,
     DateTime? endDate,
   }) async {
@@ -844,10 +890,17 @@ class HealthService {
               energyBurned: workoutData['active_energy_burned'] as double? ?? 0,
               distance: workoutData['distance'] as double?,
               source: workoutData['source'] as String,
+              segmentData: workoutData['segment_data'] as Map<String, dynamic>?,
               averageHeartRate:
                   workoutData['heart_rate_summary'] != null
                       ? (workoutData['heart_rate_summary']
                               as Map<String, dynamic>)['average']
+                          as double?
+                      : null,
+              maxHeartRate:
+                  workoutData['heart_rate_summary'] != null
+                      ? (workoutData['heart_rate_summary']
+                              as Map<String, dynamic>)['max']
                           as double?
                       : null,
             );
@@ -873,12 +926,76 @@ class HealthService {
 
   /// Fetch a specific workout by ID
   Future<Workout?> fetchWorkoutById(String workoutId) async {
-    // Fetch all workouts and find the one with matching ID
-    final history = await fetchWorkoutHistory();
     try {
-      return history.workouts.firstWhere((workout) => workout.id == workoutId);
+      debugPrint('Flutter: Fetching workout by ID: $workoutId');
+
+      // Try to get the workout directly using the native API
+      final splits = await getNativeKilometerSplits(workoutId);
+
+      if (splits.isNotEmpty) {
+        debugPrint('Flutter: Got ${splits.length} splits from native API');
+
+        // If we got splits, we need to fetch the workout details
+        // For now, we'll still need to fetch all workouts and find the matching one
+        debugPrint('Flutter: Fetching workout history to find workout details');
+        final history = await fetchWorkoutHistory();
+
+        try {
+          final workout = history.workouts.firstWhere(
+            (workout) => workout.id == workoutId,
+            orElse: () => throw Exception('Workout not found'),
+          );
+
+          debugPrint(
+            'Flutter: Found workout: ${workout.workoutType}, adding splits',
+          );
+
+          // Add the splits to the workout
+          if (workout.segmentData == null) {
+            debugPrint(
+              'Flutter: Creating new segment_data with kilometer_splits',
+            );
+            final updatedWorkout = workout.copyWith(
+              segmentData: {'kilometer_splits': splits},
+            );
+            debugPrint(
+              'Flutter: segment_data added: ${updatedWorkout.segmentData != null}',
+            );
+            return updatedWorkout;
+          } else {
+            debugPrint(
+              'Flutter: Updating existing segment_data with kilometer_splits',
+            );
+            final updatedSegmentData = Map<String, dynamic>.from(
+              workout.segmentData!,
+            );
+            updatedSegmentData['kilometer_splits'] = splits;
+            final updatedWorkout = workout.copyWith(
+              segmentData: updatedSegmentData,
+            );
+            debugPrint(
+              'Flutter: segment_data updated: ${updatedWorkout.segmentData != null}',
+            );
+            return updatedWorkout;
+          }
+        } catch (e) {
+          debugPrint('Flutter: Error finding workout in history: $e');
+          rethrow;
+        }
+      } else {
+        debugPrint(
+          'Flutter: No splits from native API, falling back to regular method',
+        );
+
+        // Fall back to the regular method
+        final history = await fetchWorkoutHistory();
+        return history.workouts.firstWhere(
+          (workout) => workout.id == workoutId,
+          orElse: () => throw Exception('Workout not found'),
+        );
+      }
     } catch (e) {
-      debugPrint('Workout with ID $workoutId not found: $e');
+      debugPrint('Flutter: Workout with ID $workoutId not found: $e');
       return null;
     }
   }
@@ -943,6 +1060,170 @@ class HealthService {
     // through the health package. In a real implementation, you would need
     // to use a different API or package to access location data.
     return [];
+  }
+
+  /// Fetch all health data for debugging purposes
+  /// Returns a map with counts of each data type
+  Future<Map<String, int>> fetchAllHealthData({
+    DateTime? startDate,
+    DateTime? endDate,
+    bool includeWorkoutDetails = true,
+  }) async {
+    // Ensure we have permissions
+    final hasPermissions = await initialize();
+    if (!hasPermissions) {
+      debugPrint('Health data permissions not granted');
+      return {'error': 1};
+    }
+
+    // Default to last year if no date range provided
+    final now = DateTime.now();
+    final start = startDate ?? now.subtract(const Duration(days: 365));
+    final end = endDate ?? now;
+
+    try {
+      final results = <String, int>{};
+
+      // Fetch workouts
+      final workouts = await _fetchAndProcessWorkouts(start, end);
+      results['workouts'] = workouts.length;
+
+      // Fetch biometrics
+      final biometrics = await _fetchBiometrics(start, end);
+      if (biometrics.containsKey('body_composition')) {
+        results['body_composition'] = 1;
+      }
+      if (biometrics.containsKey('vital_signs')) {
+        results['vital_signs'] = 1;
+      }
+
+      // Fetch activity data
+      final activities = await _fetchActivities(start, end);
+      results['activities'] = activities.length;
+
+      // Fetch sleep data
+      final sleepSessions = await _fetchSleepData(start, end);
+      results['sleep_sessions'] = sleepSessions.length;
+
+      return results;
+    } catch (e) {
+      debugPrint('Error fetching all health data: $e');
+      return {'error': 1};
+    }
+  }
+
+  /// Fetch workout history with native kilometer splits
+  /// This uses the native HealthKit API directly for more accurate data
+  Future<WorkoutHistory> fetchWorkoutHistoryWithNativeSplits({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    debugPrint('Flutter: Fetching workout history with native splits');
+
+    // Ensure we have permissions
+    final hasPermissions = await initialize();
+    if (!hasPermissions) {
+      debugPrint('Flutter: Health data permissions not granted');
+      return WorkoutHistory(
+        workouts: [],
+        userId: _apiService.userId ?? 'unknown',
+        lastSyncTime: DateTime.now(),
+      );
+    }
+
+    try {
+      debugPrint('Flutter: Calling native getWorkoutsWithSplits');
+      // Use the native channel to get workouts with splits
+      final workoutsWithSplits = await _nativeHealthService
+          .getWorkoutsWithSplits(startDate: startDate, endDate: endDate);
+
+      debugPrint(
+        'Flutter: Native returned ${workoutsWithSplits.length} workouts',
+      );
+
+      if (workoutsWithSplits.isEmpty) {
+        debugPrint(
+          'Flutter: No workouts found with native splits, falling back to regular method',
+        );
+        // Fall back to regular method if native method returns no data
+        return _fetchWorkoutHistoryWithFlutterHealthPackage(
+          startDate: startDate,
+          endDate: endDate,
+        );
+      }
+
+      // Convert to Workout objects
+      final workouts =
+          workoutsWithSplits.map((data) {
+            return Workout(
+              id: data['id'] as String,
+              workoutType: data['workout_type'] as String,
+              startTime: DateTime.parse(data['start_date'] as String),
+              endTime: DateTime.parse(data['end_date'] as String),
+              durationInSeconds: (data['duration_seconds'] as double).toInt(),
+              energyBurned: data['active_energy_burned'] as double? ?? 0,
+              distance: data['distance'] as double?,
+              source: data['source'] as String,
+              segmentData: data['segment_data'] as Map<String, dynamic>?,
+              averageHeartRate:
+                  data['heart_rate_summary'] != null
+                      ? (data['heart_rate_summary']
+                              as Map<String, dynamic>)['average']
+                          as double?
+                      : null,
+              maxHeartRate:
+                  data['heart_rate_summary'] != null
+                      ? (data['heart_rate_summary']
+                              as Map<String, dynamic>)['max']
+                          as double?
+                      : null,
+            );
+          }).toList();
+
+      // Sort workouts by date (newest first)
+      workouts.sort((a, b) => b.startTime.compareTo(a.startTime));
+
+      debugPrint('Found ${workouts.length} workouts with native splits');
+
+      return WorkoutHistory(
+        workouts: workouts,
+        userId: _apiService.userId ?? 'unknown',
+        lastSyncTime: DateTime.now(),
+      );
+    } catch (e) {
+      debugPrint('Error fetching workout history with native splits: $e');
+      // Fall back to regular method if native method fails
+      return fetchWorkoutHistory(startDate: startDate, endDate: endDate);
+    }
+  }
+
+  /// Get kilometer splits for a specific workout using native API
+  /// This provides more accurate split data than the calculated method
+  Future<List<Map<String, dynamic>>> getNativeKilometerSplits(
+    String workoutId,
+  ) async {
+    try {
+      debugPrint(
+        'Flutter: Getting native kilometer splits for workout: $workoutId',
+      );
+      await initialize();
+      final splits = await _nativeHealthService.getWorkoutKilometerSplits(
+        workoutId,
+      );
+      debugPrint(
+        'Flutter: Received ${splits.length} kilometer splits from native',
+      );
+
+      // Log the first split if available
+      if (splits.isNotEmpty) {
+        debugPrint('Flutter: First split: ${splits.first}');
+      }
+
+      return splits;
+    } catch (e) {
+      debugPrint('Flutter: Error fetching native kilometer splits: $e');
+      return [];
+    }
   }
 
   /// Calculate heart rate statistics from samples

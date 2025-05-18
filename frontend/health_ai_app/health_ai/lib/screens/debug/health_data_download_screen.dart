@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../services/health_service.dart';
+import '../../services/unified_health_service.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import 'server_settings_screen.dart';
@@ -14,7 +14,7 @@ class HealthDataDownloadScreen extends StatefulWidget {
 }
 
 class _HealthDataDownloadScreenState extends State<HealthDataDownloadScreen> {
-  final HealthService _healthService = HealthService();
+  final UnifiedHealthService _healthService = UnifiedHealthService();
   final ApiService _apiService = ApiService();
   bool _isLoading = false;
   bool _isUploading = false;

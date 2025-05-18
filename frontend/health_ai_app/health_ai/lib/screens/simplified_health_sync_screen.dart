@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:health_ai/services/api_service.dart';
-import 'package:health_ai/services/health_service.dart';
+import 'package:health_ai/services/unified_health_service.dart';
 import 'package:health_ai/theme/app_theme.dart';
 
 /// A simplified screen for health data synchronization
@@ -14,7 +14,7 @@ class SimplifiedHealthSyncScreen extends StatefulWidget {
 
 class _SimplifiedHealthSyncScreenState
     extends State<SimplifiedHealthSyncScreen> {
-  final _healthService = HealthService();
+  final _healthService = UnifiedHealthService();
   final _apiService = ApiService();
 
   bool _isLoading = false;

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:health_ai/services/health_service.dart';
+import 'package:health_ai/services/unified_health_service.dart';
 import 'package:health_ai/services/biometrics_fetcher.dart';
 import 'package:health_ai/services/api_service.dart';
 
@@ -11,7 +11,7 @@ class HealthSyncScreen extends StatefulWidget {
 }
 
 class _HealthSyncScreenState extends State<HealthSyncScreen> {
-  final HealthService _healthService = HealthService();
+  final UnifiedHealthService _healthService = UnifiedHealthService();
   final BiometricsFetcher _biometricsFetcher = BiometricsFetcher();
   final ApiService _apiService = ApiService();
 

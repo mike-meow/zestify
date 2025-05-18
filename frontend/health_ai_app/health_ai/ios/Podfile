@@ -29,6 +29,10 @@ flutter_ios_podfile_setup
 
 target 'Runner' do
   use_frameworks!
+  use_modular_headers!
+
+  # Use specific version of HealthKitReporter required by health_kit_reporter plugin
+  pod 'HealthKitReporter', '= 3.1.0'
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   target 'RunnerTests' do

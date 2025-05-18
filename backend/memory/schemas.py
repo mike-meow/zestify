@@ -85,6 +85,7 @@ class RecentWorkout(CompactWorkout):
     active_energy_burned: Optional[float] = None
     active_energy_burned_unit: Optional[str] = None
     heart_rate_summary: Optional[Dict[str, Any]] = None
+    segment_data: Optional[Dict[str, Any]] = None
     source: Optional[str] = None
     original_type: Optional[str] = None
     workout_type: Optional[str] = None

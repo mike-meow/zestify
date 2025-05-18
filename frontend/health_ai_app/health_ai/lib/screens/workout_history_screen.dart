@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/workout/workout.dart';
 import '../models/workout/workout_history.dart';
-import '../services/health_service.dart';
+import '../services/unified_health_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bubble_card.dart';
 import 'workout_detail_screen.dart';
@@ -46,7 +46,7 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen>
   }
 
   void _loadWorkoutHistory() {
-    final healthService = HealthService();
+    final healthService = UnifiedHealthService();
     _workoutHistoryFuture = healthService.fetchWorkoutHistory();
   }
 

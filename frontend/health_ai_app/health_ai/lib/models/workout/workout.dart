@@ -59,6 +59,9 @@ class Workout extends BaseModel {
   /// Additional metadata as key-value pairs
   final Map<String, dynamic>? metadata;
 
+  /// Segment data containing kilometer/mile splits and detailed pace information
+  final Map<String, dynamic>? segmentData;
+
   Workout({
     required this.id,
     required this.workoutType,
@@ -79,6 +82,7 @@ class Workout extends BaseModel {
     this.power,
     required this.source,
     this.metadata,
+    this.segmentData,
   });
 
   /// Create a Workout from a JSON map
@@ -86,14 +90,28 @@ class Workout extends BaseModel {
     return Workout(
       id: json['id'],
       workoutType: json['type'] ?? json['workout_type'] ?? 'Unknown',
-      startTime: DateTime.parse(json['startTime']),
-      endTime: DateTime.parse(json['endTime']),
-      durationInSeconds: json['durationInSeconds'],
-      energyBurned: json['energyBurned'].toDouble(),
+      startTime: DateTime.parse(json['startTime'] ?? json['start_date']),
+      endTime: DateTime.parse(json['endTime'] ?? json['end_date']),
+      durationInSeconds: json['durationInSeconds'] ?? json['duration_seconds'],
+      energyBurned:
+          (json['energyBurned'] ?? json['active_energy_burned'] ?? 0)
+              .toDouble(),
       distance: json['distance']?.toDouble(),
-      averageHeartRate: json['averageHeartRate']?.toDouble(),
-      maxHeartRate: json['maxHeartRate']?.toDouble(),
-      minHeartRate: json['minHeartRate']?.toDouble(),
+      averageHeartRate:
+          json['averageHeartRate']?.toDouble() ??
+          (json['heart_rate_summary'] != null
+              ? json['heart_rate_summary']['average']?.toDouble()
+              : null),
+      maxHeartRate:
+          json['maxHeartRate']?.toDouble() ??
+          (json['heart_rate_summary'] != null
+              ? json['heart_rate_summary']['max']?.toDouble()
+              : null),
+      minHeartRate:
+          json['minHeartRate']?.toDouble() ??
+          (json['heart_rate_summary'] != null
+              ? json['heart_rate_summary']['min']?.toDouble()
+              : null),
       averagePace: json['averagePace']?.toDouble(),
       maxPace: json['maxPace']?.toDouble(),
       totalAscent: json['totalAscent']?.toDouble(),
@@ -101,8 +119,9 @@ class Workout extends BaseModel {
       stepCount: json['stepCount'],
       cadence: json['cadence']?.toDouble(),
       power: json['power']?.toDouble(),
-      source: json['source'],
+      source: json['source'] ?? 'Unknown',
       metadata: json['metadata'],
+      segmentData: json['segment_data'] ?? json['segmentData'],
     );
   }
 
@@ -154,6 +173,7 @@ class Workout extends BaseModel {
         'device': healthData['device'],
         'recordingMethod': healthData['recordingMethod'],
       },
+      segmentData: healthData['segment_data'],
     );
   }
 
@@ -180,6 +200,7 @@ class Workout extends BaseModel {
       'power': power,
       'source': source,
       'metadata': metadata,
+      'segmentData': segmentData,
     };
   }
 
@@ -210,14 +231,12 @@ class Workout extends BaseModel {
 
   /// Normalize workout types from various sources to a standard set
   String get normalizedType {
-    final typeLower = workoutType.toLowerCase();
-    
-    // Map specific running types to general "RUNNING"
-    if (typeLower.contains('run') || typeLower.contains('runn')) {
+    // Only map RUNNING_SAND to RUNNING, keep everything else as is
+    if (workoutType.toUpperCase() == 'RUNNING_SAND') {
       return 'RUNNING';
     }
-    
-    // Return the original type if no mapping exists
+
+    // Return the original type for all other workout types
     return workoutType;
   }
 
@@ -225,7 +244,7 @@ class Workout extends BaseModel {
   String get displayName {
     // Use normalized type to ensure consistent naming
     final normalizedWorkoutType = normalizedType;
-    
+
     // Convert workout type to a readable format (e.g., "RUNNING" -> "Running")
     return normalizedWorkoutType
         .split('_')
@@ -240,9 +259,15 @@ class Workout extends BaseModel {
 
   /// Get an icon asset name based on the workout type
   String get iconAsset {
-    // Use normalized type for consistent icon mapping
-    final typeLower = normalizedType.toLowerCase();
+    // Map RUNNING_SAND to running icon
+    if (workoutType.toUpperCase() == 'RUNNING_SAND') {
+      return 'running';
+    }
 
+    // For all other types, derive icon name from the workout type
+    final typeLower = workoutType.toLowerCase();
+
+    // Simple mapping for common workout types
     if (typeLower.contains('run')) {
       return 'running';
     }
@@ -255,47 +280,9 @@ class Workout extends BaseModel {
     if (typeLower.contains('swim')) {
       return 'swimming';
     }
-    if (typeLower.contains('hik')) {
-      return 'hiking';
-    }
-    if (typeLower.contains('yoga')) {
-      return 'yoga';
-    }
-    if (typeLower.contains('strength') || typeLower.contains('weight')) {
-      return 'strength';
-    }
-    if (typeLower.contains('hiit') || typeLower.contains('interval')) {
-      return 'hiit';
-    }
-    if (typeLower.contains('pilates')) {
-      return 'pilates';
-    }
-    if (typeLower.contains('danc')) {
-      return 'dance';
-    }
-    if (typeLower.contains('function')) {
-      return 'functional';
-    }
-    if (typeLower.contains('traditional')) {
-      return 'traditional';
-    }
-    if (typeLower.contains('core')) {
-      return 'core';
-    }
-    if (typeLower.contains('flex')) {
-      return 'flexibility';
-    }
-    if (typeLower.contains('elliptical')) {
-      return 'elliptical';
-    }
-    if (typeLower.contains('stair')) {
-      return 'stairs';
-    }
-    if (typeLower.contains('row')) {
-      return 'rowing';
-    }
 
-    return 'other';
+    // Default to the original type or 'other' if no match
+    return typeLower.isEmpty ? 'other' : typeLower;
   }
 
   /// Get the average pace as a formatted string (e.g., "5:30 /km")
@@ -367,5 +354,156 @@ class Workout extends BaseModel {
         typeLower.contains('cycl') ||
         typeLower.contains('bik') ||
         typeLower.contains('swim') && !typeLower.contains('pool');
+  }
+
+  /// Check if this workout has segment data
+  bool get hasSegmentData {
+    return segmentData != null && segmentData!.isNotEmpty;
+  }
+
+  /// Get kilometer splits if available
+  List<Map<String, dynamic>> get kilometerSplits {
+    if (segmentData == null || !segmentData!.containsKey('kilometer_splits')) {
+      return [];
+    }
+
+    return List<Map<String, dynamic>>.from(segmentData!['kilometer_splits']);
+  }
+
+  /// Get mile splits if available
+  List<Map<String, dynamic>> get mileSplits {
+    if (segmentData == null || !segmentData!.containsKey('mile_splits')) {
+      return [];
+    }
+
+    return List<Map<String, dynamic>>.from(segmentData!['mile_splits']);
+  }
+
+  /// Get the most active segments based on pace
+  List<Map<String, dynamic>> get mostActiveSegments {
+    // Try kilometer splits first
+    var splits = kilometerSplits;
+
+    // If no kilometer splits, try mile splits
+    if (splits.isEmpty) {
+      splits = mileSplits;
+    }
+
+    // If we have splits, sort them by pace (ascending - faster pace is lower number)
+    if (splits.isNotEmpty) {
+      // Create a copy to avoid modifying the original data
+      final sortedSplits = List<Map<String, dynamic>>.from(splits);
+      sortedSplits.sort(
+        (a, b) => (a['pace'] as double).compareTo(b['pace'] as double),
+      );
+
+      // Return the fastest 3 segments or all if less than 3
+      return sortedSplits.take(3).toList();
+    }
+
+    return [];
+  }
+
+  /// Calculate estimated active duration based on segment data
+  int get estimatedActiveDurationFromSegments {
+    if (!hasSegmentData) {
+      // Fall back to total duration if no segment data
+      return durationInSeconds;
+    }
+
+    // If we have segment data, we can use the most active segments to estimate
+    final activeSegments = mostActiveSegments;
+    if (activeSegments.isEmpty) {
+      // Fall back to total duration if no active segments found
+      return durationInSeconds;
+    }
+
+    // Calculate average pace from the most active segments
+    double totalPace = 0;
+    for (final segment in activeSegments) {
+      totalPace += segment['pace'] as double;
+    }
+    double averageActivePace = totalPace / activeSegments.length;
+
+    // Estimate active duration based on distance and average active pace
+    if (distance != null && distance! > 0) {
+      // Convert from meters to kilometers for calculation
+      final distanceInKm = distance! / 1000;
+
+      // Calculate estimated active duration
+      // average pace is in minutes per km, so multiply by distance in km to get minutes
+      // then convert to seconds
+      final activeMinutes = averageActivePace * distanceInKm;
+      return (activeMinutes * 60).round();
+    }
+
+    // Fall back to 80% of total duration if calculation not possible
+    return (durationInSeconds * 0.8).round();
+  }
+
+  /// Get active pace based on segment data
+  double? get activePaceFromSegments {
+    if (distance == null || distance! <= 0) return null;
+
+    final activeDuration = estimatedActiveDurationFromSegments;
+    // Convert seconds per meter to minutes per kilometer
+    return (activeDuration / distance!) * (1000 / 60);
+  }
+
+  /// Get the formatted active pace based on segment data
+  String get formattedActivePace {
+    final pace = activePaceFromSegments;
+    if (pace == null) return formattedPace; // Fall back to regular pace
+
+    final minutes = pace.floor();
+    final seconds = ((pace - minutes) * 60).round();
+    return '$minutes:${seconds.toString().padLeft(2, '0')} /km';
+  }
+
+  /// Create a copy of this Workout with the given fields replaced with new values
+  Workout copyWith({
+    String? id,
+    String? workoutType,
+    DateTime? startTime,
+    DateTime? endTime,
+    int? durationInSeconds,
+    double? energyBurned,
+    double? distance,
+    double? averageHeartRate,
+    double? maxHeartRate,
+    double? minHeartRate,
+    double? averagePace,
+    double? maxPace,
+    double? totalAscent,
+    double? totalDescent,
+    int? stepCount,
+    double? cadence,
+    double? power,
+    String? source,
+    Map<String, dynamic>? metadata,
+    Map<String, dynamic>? segmentData,
+  }) {
+    return Workout(
+      id: id ?? this.id,
+      workoutType: workoutType ?? this.workoutType,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      durationInSeconds: durationInSeconds ?? this.durationInSeconds,
+      energyBurned: energyBurned ?? this.energyBurned,
+      distance: distance ?? this.distance,
+      averageHeartRate: averageHeartRate ?? this.averageHeartRate,
+      maxHeartRate: maxHeartRate ?? this.maxHeartRate,
+      minHeartRate: minHeartRate ?? this.minHeartRate,
+      averagePace: averagePace ?? this.averagePace,
+      maxPace: maxPace ?? this.maxPace,
+      totalAscent: totalAscent ?? this.totalAscent,
+      totalDescent: totalDescent ?? this.totalDescent,
+      stepCount: stepCount ?? this.stepCount,
+      cadence: cadence ?? this.cadence,
+      power: power ?? this.power,
+      source: source ?? this.source,
+      metadata: metadata ?? this.metadata,
+      segmentData: segmentData ?? this.segmentData,
+    );
   }
 }

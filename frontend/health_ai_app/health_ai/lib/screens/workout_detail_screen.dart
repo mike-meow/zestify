@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/workout/workout.dart';
 import '../models/workout/heart_rate_sample.dart';
-import '../services/health_service.dart';
+import '../services/unified_health_service.dart';
 import '../theme/app_theme.dart';
 
 class WorkoutDetailScreen extends StatefulWidget {
@@ -25,7 +25,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
   }
 
   void _loadWorkout() {
-    final healthService = HealthService();
+    final healthService = UnifiedHealthService();
     _workoutFuture = healthService.fetchWorkoutById(widget.workoutId);
     _workoutFuture.then((workout) {
       if (workout != null) {
@@ -419,7 +419,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
 
                 // Get heart rate statistics
                 final samples = snapshot.data!;
-                final healthService = HealthService();
+                final healthService = UnifiedHealthService();
                 final stats = healthService.calculateHeartRateStats(samples);
 
                 // Heart rate chart would go here

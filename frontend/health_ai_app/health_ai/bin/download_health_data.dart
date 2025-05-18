@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:health_ai/services/health_service.dart';
+import 'package:health_ai/services/unified_health_service.dart';
 
 /// Command-line tool to download all health data
 void main() async {
@@ -11,7 +11,7 @@ void main() async {
   print('------------------------');
   print('Downloading all health data...');
 
-  final healthService = HealthService();
+  final healthService = UnifiedHealthService();
 
   // Initialize health service
   final hasPermissions = await healthService.initialize();
