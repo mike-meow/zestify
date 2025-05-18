@@ -19,7 +19,7 @@ class FeatureFlagService {
 
   /// Feature flags
   final Map<String, bool> _featureFlags = {
-    'use_health_kit_reporter': false, // Default to false
+    'use_health_kit_reporter': true, // Default to true – use HealthKitReporter by default
   };
 
   /// Initialize the service
