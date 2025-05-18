@@ -1,0 +1,6 @@
+{
+  "snapshot": "snapshot-20250518-eb2a4184-4363-4106-9b1b-4354a385ccff",
+  "install": "#!/bin/bash\n\n# Install system dependencies\nsudo apt-get update\nsudo apt-get install -y python3-venv curl git xz-utils zip libglu1-mesa\n\n# Install Flutter\nsudo snap install flutter --classic\n\n# Setup Python environment\ncd /workspace\npython3 -m venv venv\nsource venv/bin/activate\npip install -e \".[dev]\"\n\n# Setup Flutter dependencies\ncd /workspace/frontend/health_ai_app/health_ai\nflutter pub get",
+  "start": "#!/bin/bash\n\n# Activate Python environment\ncd /workspace\nsource venv/bin/activate\n\n# Start Flutter app\ncd /workspace/frontend/health_ai_app/health_ai\nflutter run",
+  "terminals": []
+}
