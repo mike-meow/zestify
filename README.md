@@ -1,51 +1,88 @@
-# Hyper-Personalized AI Wellness Coach App
+# Zestify - AI-Powered Personal Wellness Assistant
 
-An app combining generative AI with behavioral science to create tailored wellness plans (fitness, nutrition, mental health). Unlike generic apps, it uses real-time data (wearables, user input) to adapt recommendations.
+An intelligent wellness platform that combines generative AI with behavioral science to create personalized health and fitness plans. The app adapts its recommendations based on real-time data from user input and wearables, providing a truly personalized wellness experience.
 
-# Features
+## Project Overview
 
-- Deep contextual understanding of user's historical and recent health conditions
-- Personalized, data-driven wellness plans
-- Real-time feedback and adjustments based on user data
-- Gamified elements to increase engagement
-- Privacy-first approach with on-device processing where needed
+Zestify is built with a modern tech stack:
+- **Backend**: Python 3.11+ with FastAPI
+- **Frontend**: Flutter for cross-platform support
+- **AI Integration**: Support for multiple LLM providers
+- **Data Processing**: Real-time processing and memory management
 
-# Tech Stack
+## Core Components
 
-### Framework: Flutter
+### Backend Architecture (`/backend`)
+- `services/`: Core business logic and API endpoints
+- `memory/`: Data persistence and state management
+- `prompts/`: LLM prompt templates and configurations
+- `llm/`: AI model integrations and abstractions
+- `examples/`: Sample implementations and demos
+- `docs/`: Additional documentation
 
-Cross-platform (iOS, Android, Web)
-Rich UI capabilities for gamified, flashy interfaces
-Hot reload for rapid iteration
+### Key Features
+- Deep contextual understanding of user's health data
+- Personalized wellness plan generation
+- Real-time feedback and plan adjustments
+- Privacy-focused data handling
+- Gamified engagement elements
 
-## Backend
+## Technical Stack
 
-Options:
+### Backend Framework
+- FastAPI for high-performance API endpoints
+- Pydantic for data validation
+- Uvicorn for ASGI server
 
-Python: FastAPI for AI API integration
-Go: High performance, functional approach
-Serverless deployment (AWS Lambda, Google Cloud Functions)
+### Development Tools
+- Python 3.11+ required
+- Black for code formatting
+- Ruff for linting
+- MyPy for type checking
+- Pytest for testing
 
-## AI Integration
+### Frontend (Flutter)
+- Cross-platform support (iOS, Android, Web)
+- Rich UI capabilities
+- Hot reload for rapid development
+- Component-based architecture
 
-- API-based intelligence (OpenAI, Anthropic, etc.)
-- (optional)On-device processing where privacy needed (TensorFlow Lite/CoreML)
+## Getting Started
 
-## Testing Framework
+1. Clone the repository
+2. Copy `.env.example` to `.env` and configure your environment variables
+3. Install dependencies:
+   ```bash
+   pip install -e ".[dev]"
+   ```
+4. Run the development server:
+   ```bash
+   uvicorn backend.services.api:app --reload
+   ```
 
-Flutter Testing
+## Development Workflow
 
-Widget tests for component validation
-Golden tests for UI screenshot comparison
-Integration tests for full app flows
+- Use `make` commands for common tasks (see Makefile)
+- Follow Python type hints and documentation standards
+- Run tests before submitting PRs
+- Use feature branches for development
 
-## CI/CD
+## Testing
 
-Codemagic: Flutter-specific CI/CD with visual testing tools
-Alternative: GitHub Actions with Flutter action
+- Backend: Pytest for unit and integration tests
+- Frontend: Flutter testing framework
+  - Widget tests
+  - Golden tests for UI
+  - Integration tests
 
-Development Workflow
+## Contributing
 
-Design → Code: Use screenshots + LLM to generate initial UI components
-Iterate: Hot reload to quickly test and refine
-Component library: Build reusable widgets for consistency
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests and linting
+5. Submit a pull request
+
+## License
+
+[License information to be added]
